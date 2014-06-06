@@ -21,34 +21,53 @@ var _ = Describe("HTTPCallback", func() {
 
 	Describe("Invoke()", func() {
 		var (
+			payload = `{"foo": "bar"}`
 			serv    *httptest.Server
 			req     *http.Request
 			reqbody string
-			payload string
 		)
 
-		BeforeEach(func() {
-			payload = `{"foo": "bar"}`
-			serv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				b, _ := ioutil.ReadAll(r.Body)
-				reqbody = string(b)
-				req = r
-			}))
-		})
-
 		AfterEach(func() {
-			serv.Close()
+			if serv != nil {
+				serv.Close()
+			}
 		})
 
 		doAction := func() {
 			cb.Invoke(serv.URL, payload)
 		}
 
-		It("makes an http request", func() {
-			doAction()
-			Expect(req).NotTo(BeNil())
-			Expect(req.Method).To(Equal("POST"))
-			Expect(reqbody).To(Equal(payload))
+		itWorks := func() {
+			It("makes an http request", func() {
+				doAction()
+				Expect(req).NotTo(BeNil())
+				Expect(req.Method).To(Equal("POST"))
+				Expect(reqbody).To(Equal(payload))
+			})
+		}
+
+		Context("when a given url is for a http server without tls/ssl", func() {
+			BeforeEach(func() {
+				serv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					b, _ := ioutil.ReadAll(r.Body)
+					reqbody = string(b)
+					req = r
+				}))
+			})
+
+			itWorks()
+		})
+
+		Context("when a given url is for a https server", func() {
+			BeforeEach(func() {
+				serv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					b, _ := ioutil.ReadAll(r.Body)
+					reqbody = string(b)
+					req = r
+				}))
+			})
+
+			itWorks()
 		})
 	})
 })
