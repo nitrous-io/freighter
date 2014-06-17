@@ -6,6 +6,7 @@ BIN_NAME=freighterd
 REVISION=$(shell git rev-parse --short HEAD)
 BASE_VERSION=$(shell cat VERSION)
 VERSION=$(BASE_VERSION)-$(REVISION)
+HUB_NAME=1atrengganu2
 
 all: build
 
@@ -38,4 +39,18 @@ run: build
 	@echo "$(OK_COLOR)==> Running...$(NO_COLOR)"
 	@build/$(BIN_NAME)
 
-.PHONY: all install-deps build format test run
+prod-image:
+	@echo "$(OK_COLOR)==> Building prod image...$(NO_COLOR)"
+	@./script/run-build $(VERSION)
+	@ln -s docker/prod/Dockerfile .
+	@docker build -t $(HUB_NAME)/freighter-prod:$(REVISION) .
+	@rm Dockerfile
+	@docker push $(HUB_NAME)/freighter-prod:$(REVISION)
+
+dev-image:
+	@echo "$(OK_COLOR)==> Building dev image...$(NO_COLOR)"
+	@ln -s docker/dev/Dockerfile .
+	@docker build -t $(HUB_NAME)/freighter-dev:$(REVISION) .
+	@rm Dockerfile
+
+.PHONY: all install-deps build format test run prod-image dev-image
