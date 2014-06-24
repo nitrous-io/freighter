@@ -4,3 +4,5 @@ github.com/mattn/go-sqlite3 #71e406bc794a7c7f38f8b124ed335fcfcc3b9676
 github.com/gorilla/mux #854d482e26505d59549690719cbc009f04042c2e
 github.com/gorilla/context #14f550f51af52180c2eefed15e5fd18d63c0a64a
 github.com/fsouza/go-dockerclient #5e5b0c4275b4ea28690cfed6dd3550bfd3701683
+github.com/kr/pty #67e2db24c831afa6c64fc17b4a143390674365ef
+github.com/nitrous-io/nitrous-common #534a33b553508b717d30d28160f8dbebb482f16c
