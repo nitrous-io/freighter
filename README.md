@@ -470,6 +470,15 @@ Content-Type: application/json; charset=utf-8
 POST /containers/2cf1503ed6a0/shells HTTP/1.1
 ```
 
+**Query Params**:
+
+- **username** - _(optional)_ username that we want to login to. Default to
+  root
+- **term** - _(optional)_ type of term that we want to create. Default to
+  xterm-256color
+- **width** - _(optional)_ initial width of the term. Default to 80
+- **height** - _(optional)_ initial height of the term. Default to 60
+
 **Example response**:
 
 ```javascript
