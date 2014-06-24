@@ -10,11 +10,30 @@ import (
 	"github.com/nitrous-io/nitrous-common/term"
 )
 
+const (
+	defaultUsername = "root"
+	defaultTerm     = "xterm-256color"
+	defaultWidth    = 80
+	defaultHeight   = 60
+)
+
 var (
 	ErrInvalidTerm = errors.New("Invalid term")
 )
 
 func NewShell(id, username, term string, width, height int) (*Shell, error) {
+	if username == "" {
+		username = defaultUsername
+	}
+	if term == "" {
+		term = defaultTerm
+	}
+	if width == 0 {
+		width = defaultWidth
+	}
+	if height == 0 {
+		height = defaultHeight
+	}
 	s := &Shell{
 		id:       id,
 		username: username,
