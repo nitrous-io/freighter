@@ -169,14 +169,8 @@ func (s *Server) createShell(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	username := r.FormValue("username")
-	width, err := strconv.Atoi(r.FormValue("width"))
-	if err != nil {
-		return err
-	}
-	height, err := strconv.Atoi(r.FormValue("height"))
-	if err != nil {
-		return err
-	}
+	width := getFormInt(r, "width")
+	height := getFormInt(r, "height")
 
 	shell, err := shell.NewShell(id, username)
 	if err != nil {
@@ -231,20 +225,11 @@ func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("Invalid shell %v", shellId)
 	}
 
-	width, err := strconv.Atoi(r.FormValue("width"))
-	if err != nil {
-		return fmt.Errorf("Invalid width %v", err)
-	}
-
-	height, err := strconv.Atoi(r.FormValue("height"))
-	if err != nil {
-		return fmt.Errorf("Invalid height %v", err)
-	}
-
+	width := getFormInt(r, "width")
+	height := getFormInt(r, "height")
 	if err := shell.Resize(width, height); err != nil {
 		return fmt.Errorf("Resize failed %v", err)
 	}
-
 	s.respond(w, http.StatusAccepted, jsonStatusAccepted)
 	return nil
 }
@@ -266,4 +251,12 @@ func randomString() string {
 		panic(err)
 	}
 	return hex.EncodeToString(id)
+}
+
+func getFormInt(r *http.Request, k string) int {
+	v, err := strconv.Atoi(r.FormValue(k))
+	if err != nil {
+		return 0
+	}
+	return v
 }
