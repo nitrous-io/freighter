@@ -11,6 +11,17 @@ import (
 	"github.com/nitrous-io/nitrous-common/term"
 )
 
+// writer that sends all data written to it into a channel
+type chanWriter struct {
+	ch chan []byte
+	w  io.Writer
+}
+
+func (cw *chanWriter) Write(p []byte) (int, error) {
+	cw.ch <- p
+	return cw.w.Write(p)
+}
+
 func testShell() *Shell {
 	s := &Shell{
 		id:       "localbox",
@@ -85,21 +96,19 @@ func TestShellAttach(t *testing.T) {
 
 	go io.Copy(out, stdoutR)
 
-	done := s.Attach(stdinR, stdoutW)
+	written := make(chan []byte)
+	go s.Attach(stdinR, &chanWriter{ch: written, w: stdoutW})
 
 	go func() {
 		fmt.Fprint(stdinW, "echo")
-		<-time.After(200 * time.Millisecond)
-		stdinR.CloseWithError(io.EOF)
-		stdoutW.CloseWithError(io.EOF)
 	}()
 
 	select {
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(1000 * time.Millisecond):
 		t.Fatal("timed out")
-	case <-done:
-		if c := out.String(); c != "echo" {
-			t.Fatalf("Expect %v, got %v", "echo", c)
+	case data := <-written:
+		if string(data) != "echo" {
+			t.Fatalf("Unexpected data %v", string(data))
 		}
 	}
 }
