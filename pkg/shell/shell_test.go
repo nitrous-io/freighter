@@ -20,24 +20,62 @@ func testShell() *Shell {
 	return s
 }
 
-func TestShellOpen(t *testing.T) {
-	s := testShell()
-	defer s.Close()
-	err := s.Open("xterm-256color", 100, 80)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
+func TestNewShell(t *testing.T) {
+	testCases := []struct {
+		id, expectedId             string
+		username, expectedUsername string
+		expectedError              bool
+	}{
+		{id: "", username: "action", expectedError: true},
+		{id: "1234", expectedId: "1234", username: "action", expectedUsername: "action"},
+		{id: "1234", expectedId: "1234", expectedUsername: defaultUsername},
 	}
-	ws, err := term.GetWinsize(s.fd())
-	if err != nil || ws.Width != 100 || ws.Height != 80 {
-		t.Fatalf("Unexpected size %v %v", ws, err)
+	for _, tc := range testCases {
+		s, err := NewShell(tc.id, tc.username)
+		switch {
+		case tc.expectedError && err != nil:
+			continue
+		case tc.expectedError && err == nil:
+			t.Fatalf("Expected err but pass %+v", tc)
+		case tc.expectedId != s.id || tc.expectedUsername != s.username:
+			t.Fatalf("Incorrect id or username %+v %+v", tc, s)
+		}
+	}
+}
+
+func TestShellOpen(t *testing.T) {
+	testCases := []struct {
+		w, ew int
+		h, eh int
+	}{
+		{ew: defaultWidth, eh: defaultHeight},
+		{w: 1024, ew: 1024},
+		{h: 1024, eh: 1024},
+	}
+
+	for _, tc := range testCases {
+		s := testShell()
+		if err := s.Open(tc.w, tc.h); err != nil {
+			t.Fatalf("Unexpected error %v", err)
+		}
+		ws, err := term.GetWinsize(s.fd())
+		if err != nil {
+			t.Fatalf("Unexpected error %v", err)
+		}
+		if tc.ew > 0 && tc.ew != int(ws.Width) {
+			t.Fatalf("Incorrect term width %+v %+v", tc, ws)
+		}
+		if tc.eh > 0 && tc.eh != int(ws.Height) {
+			t.Fatalf("Incorrect term height %+v %+v", tc, ws)
+		}
+		s.Close()
 	}
 }
 
 func TestShellAttach(t *testing.T) {
 	s := testShell()
 	defer s.Close()
-	err := s.Open("xterm-256color", 100, 80)
-	if err != nil {
+	if err := s.Open(100, 80); err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
@@ -69,8 +107,7 @@ func TestShellAttach(t *testing.T) {
 func TestShellResize(t *testing.T) {
 	s := testShell()
 	defer s.Close()
-	err := s.Open("xterm-256color", 100, 80)
-	if err != nil {
+	if err := s.Open(100, 80); err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	ws, err := term.GetWinsize(s.fd())
@@ -78,8 +115,7 @@ func TestShellResize(t *testing.T) {
 		t.Fatalf("Unexpected size %v %v", ws, err)
 	}
 
-	err = s.Resize(80, 80)
-	if err != nil {
+	if err = s.Resize(80, 80); err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	ws, err = term.GetWinsize(s.fd())

@@ -18,29 +18,20 @@ const (
 )
 
 var (
+	ErrMissingId   = errors.New("Missing id")
 	ErrInvalidTerm = errors.New("Invalid term")
 )
 
-func NewShell(id, username, term string, width, height int) (*Shell, error) {
+func NewShell(id, username string) (*Shell, error) {
+	if id == "" {
+		return nil, ErrMissingId
+	}
 	if username == "" {
 		username = defaultUsername
-	}
-	if term == "" {
-		term = defaultTerm
-	}
-	if width == 0 {
-		width = defaultWidth
-	}
-	if height == 0 {
-		height = defaultHeight
 	}
 	s := &Shell{
 		id:       id,
 		username: username,
-	}
-	if err := s.Open(term, width, height); err != nil {
-		s.Close()
-		return nil, err
 	}
 	return s, nil
 }
@@ -58,12 +49,18 @@ func (s *Shell) Close() error {
 	return s.term.Close()
 }
 
-func (s *Shell) Open(term string, w, h int) error {
+func (s *Shell) Open(w, h int) error {
+	if w == 0 {
+		w = defaultWidth
+	}
+	if h == 0 {
+		h = defaultHeight
+	}
 	if s.cmd == nil {
 		args := []string{
 			"--name", s.id,
 			"--clear-env",
-			"--set-var", "TERM=" + term,
+			"--set-var", "TERM=" + defaultTerm,
 			"--",
 			"sudo", "login", "-f", s.username,
 		}
