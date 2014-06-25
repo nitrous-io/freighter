@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"syscall"
+	"time"
 
 	"github.com/kr/pty"
 	"github.com/nitrous-io/nitrous-common/term"
@@ -15,6 +17,8 @@ const (
 	defaultTerm     = "xterm-256color"
 	defaultWidth    = 80
 	defaultHeight   = 60
+
+	defaultTimeout = 100 * time.Millisecond
 )
 
 var (
@@ -46,6 +50,9 @@ type Shell struct {
 }
 
 func (s *Shell) Close() error {
+	if s.cmd.Process != nil {
+		closeProcess(s.cmd.Process, defaultTimeout)
+	}
 	return s.term.Close()
 }
 
@@ -132,4 +139,23 @@ func promise(f func() error) chan error {
 		ch <- f()
 	}()
 	return ch
+}
+
+// close the process by sending it SIGTERM and wait for it to complete.
+// If it cant finish after timeout, kill it
+func closeProcess(p *os.Process, timeout time.Duration) {
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.Wait()
+		done <- err
+	}()
+
+	p.Signal(syscall.SIGTERM)
+	select {
+	case <-time.After(timeout):
+		p.Kill()
+		return
+	case <-done:
+		return
+	}
 }

@@ -96,7 +96,7 @@ func TestShellAttach(t *testing.T) {
 
 	go io.Copy(out, stdoutR)
 
-	written := make(chan []byte)
+	written := make(chan []byte, 1)
 	go s.Attach(stdinR, &chanWriter{ch: written, w: stdoutW})
 
 	go func() {
@@ -110,6 +110,9 @@ func TestShellAttach(t *testing.T) {
 		if string(data) != "echo" {
 			t.Fatalf("Unexpected data %v", string(data))
 		}
+		stdinW.Close()
+		stdoutW.Close()
+		s.cmd.Wait()
 	}
 }
 
