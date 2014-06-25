@@ -119,16 +119,22 @@ func TestShellResize(t *testing.T) {
 	if err := s.Open(100, 80); err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	ws, err := term.GetWinsize(s.fd())
-	if err != nil || ws.Width != 100 || ws.Height != 80 {
-		t.Fatalf("Unexpected size %v %v", ws, err)
+
+	testCases := []struct {
+		w, ew int
+		h, eh int
+	}{
+		{w: 80, h: 80, ew: 80, eh: 80},
+		{ew: defaultWidth, eh: defaultHeight},
 	}
 
-	if err = s.Resize(80, 80); err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	ws, err = term.GetWinsize(s.fd())
-	if err != nil || ws.Width != 80 || ws.Height != 80 {
-		t.Fatalf("Unexpected size %v %v", ws, err)
+	for _, tc := range testCases {
+		if err := s.Resize(tc.w, tc.h); err != nil {
+			t.Fatalf("Unexpected error %v", err)
+		}
+		ws, err := term.GetWinsize(s.fd())
+		if err != nil || int(ws.Width) != tc.ew || int(ws.Height) != tc.eh {
+			t.Fatalf("Unexpected size %v %v with test %+v", ws, err, tc)
+		}
 	}
 }

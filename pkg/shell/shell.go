@@ -107,6 +107,12 @@ func (s *Shell) Attach(stdin io.Reader, stdout io.Writer) chan error {
 }
 
 func (s *Shell) Resize(w, h int) error {
+	if w == 0 {
+		w = defaultWidth
+	}
+	if h == 0 {
+		h = defaultHeight
+	}
 	return term.SetWinsize(s.fd(), &term.Winsize{
 		Width:  uint16(w),
 		Height: uint16(h),
