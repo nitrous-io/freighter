@@ -66,7 +66,7 @@ func (s *Server) drawRoutes() {
 	s.route("/containers/{id}/public_keys", s.listPublicKeys, "GET")
 	s.route("/containers/{id}/public_keys", s.addPublicKeys, "POST", "PUT")
 	s.route("/containers/{id}/public_keys/{key_fingerprint}", s.removePublicKey, "DELETE")
-	s.route("/containers/{id}/shells", s.createShell, "POST")
-	s.route("/shells/{id}/attach", s.attachShell, "POST")
-	s.route("/shells/{id}/resize", s.resizeShell, "POST")
+	s.route("/containers/{id}/shells", s.wrapError(s.createShell), "POST")
+	s.route("/shells/{id}/attach", s.wrapError(s.attachShell), "POST")
+	s.route("/shells/{id}/resize", s.wrapError(s.resizeShell), "POST")
 }

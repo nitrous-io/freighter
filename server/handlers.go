@@ -158,54 +158,52 @@ func (s *Server) removePublicKey(w http.ResponseWriter, r *http.Request) {
 	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"public_keys": allPubKeys})
 }
 
-func (s *Server) createShell(w http.ResponseWriter, r *http.Request) {
+func (s *Server) createShell(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
 	info, err := s.provider.GetInfo(id)
 	if err != nil {
-		s.handleError(w, err)
-		return
+		return err
 	}
 	if info.State != provider.ContainerStateRunning {
-		s.handleError(w, fmt.Errorf("Cannot attach to stopped container %v", id))
-		return
+		return fmt.Errorf("Cannot attach to stopped container %v", id)
 	}
 
 	username := r.FormValue("username")
-	term := r.FormValue("term")
 	width, err := strconv.Atoi(r.FormValue("width"))
 	if err != nil {
-		s.handleError(w, err)
-		return
+		return err
 	}
 	height, err := strconv.Atoi(r.FormValue("height"))
 	if err != nil {
-		s.handleError(w, err)
-		return
+		return err
 	}
 
-	shell, err := shell.NewShell(id, username, term, width, height)
+	shell, err := shell.NewShell(id, username)
 	if err != nil {
-		s.handleError(w, err)
-		return
+		return err
 	}
 	shellId := randomString()
 	s.shells[shellId] = shell
+
+	if err := shell.Open(width, height); err != nil {
+		shell.Close()
+		return err
+	}
 	s.respondEncodeJson(w, http.StatusOK, map[string]interface{}{"id": shellId})
+	return nil
 }
 
-func (s *Server) attachShell(w http.ResponseWriter, r *http.Request) {
+func (s *Server) attachShell(w http.ResponseWriter, r *http.Request) error {
 	shellId := mux.Vars(r)["id"]
 	shell, ok := s.shells[shellId]
 	if !ok {
-		s.handleError(w, fmt.Errorf("Invalid shell %v", shellId))
-		return
+		return fmt.Errorf("Invalid shell %v", shellId)
 	}
 
 	stdin, stdout, err := hijackServer(w)
 	if err != nil {
 		shell.Close()
-		s.handleError(w, err)
-		return
+		return err
 	}
 
 	defer func() {
@@ -223,34 +221,32 @@ func (s *Server) attachShell(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	<-shell.Attach(stdin, stdout)
+	return nil
 }
 
-func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) {
+func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) error {
 	shellId := mux.Vars(r)["id"]
 	shell, ok := s.shells[shellId]
 	if !ok {
-		s.handleError(w, fmt.Errorf("Invalid shell %v", shellId))
-		return
+		return fmt.Errorf("Invalid shell %v", shellId)
 	}
 
 	width, err := strconv.Atoi(r.FormValue("width"))
 	if err != nil {
-		s.handleError(w, fmt.Errorf("Invalid width %v", err))
-		return
+		return fmt.Errorf("Invalid width %v", err)
 	}
 
 	height, err := strconv.Atoi(r.FormValue("height"))
 	if err != nil {
-		s.handleError(w, fmt.Errorf("Invalid height %v", err))
-		return
+		return fmt.Errorf("Invalid height %v", err)
 	}
 
 	if err := shell.Resize(width, height); err != nil {
-		s.handleError(w, fmt.Errorf("Resize failed %v", err))
-		return
+		return fmt.Errorf("Resize failed %v", err)
 	}
 
 	s.respond(w, http.StatusAccepted, jsonStatusAccepted)
+	return nil
 }
 
 func hijackServer(w http.ResponseWriter) (io.ReadCloser, io.Writer, error) {

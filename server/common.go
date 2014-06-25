@@ -14,6 +14,17 @@ var (
 	jsonErrorNotFound  = []byte(`{"error":"no such container"}`)
 )
 
+type httpFunc func(w http.ResponseWriter, r *http.Request) error
+
+func (s *Server) wrapError(handler httpFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := handler(w, r); err != nil {
+			s.handleError(w, err)
+			return
+		}
+	}
+}
+
 func (s *Server) handleError(w http.ResponseWriter, err error) {
 	s.logger.Error(err)
 	if err != nil {
