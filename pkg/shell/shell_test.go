@@ -112,7 +112,6 @@ func TestShellAttach(t *testing.T) {
 		}
 		stdinW.Close()
 		stdoutW.Close()
-		s.cmd.Wait()
 	}
 }
 

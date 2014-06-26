@@ -51,7 +51,7 @@ type Shell struct {
 
 func (s *Shell) Close() error {
 	if s.cmd.Process != nil {
-		closeProcess(s.cmd.Process, defaultTimeout)
+		go closeProcess(s.cmd, defaultTimeout)
 	}
 	return s.term.Close()
 }
@@ -143,19 +143,16 @@ func promise(f func() error) chan error {
 
 // close the process by sending it SIGTERM and wait for it to complete.
 // If it cant finish after timeout, kill it
-func closeProcess(p *os.Process, timeout time.Duration) {
+func closeProcess(c *exec.Cmd, timeout time.Duration) error {
 	done := make(chan error, 1)
 	go func() {
-		_, err := p.Wait()
-		done <- err
+		done <- c.Wait()
 	}()
-
-	p.Signal(syscall.SIGTERM)
+	c.Process.Signal(syscall.SIGTERM)
 	select {
 	case <-time.After(timeout):
-		p.Kill()
-		return
-	case <-done:
-		return
+		return c.Process.Kill()
+	case err := <-done:
+		return err
 	}
 }
