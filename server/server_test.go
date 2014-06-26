@@ -764,4 +764,43 @@ var _ = Describe("server", func() {
 			})
 		})
 	})
+
+	Describe("POST /containers/:id/shells", func() {
+		doRequest := func(id string) {
+			req, _ = NewRequest("POST", fmt.Sprintf("/containers/%v/shells", id), nil)
+			handler.ServeHTTP(res, req)
+		}
+
+		testCases := []struct {
+			id         string
+			container  *provider.ContainerInfo
+			statusCode int
+		}{
+			{"empty", nil, 404},
+			{"missing", &provider.ContainerInfo{ID: "aaa", State: provider.ContainerStateRunning}, 404},
+			{"stopped", &provider.ContainerInfo{ID: "stopped", State: provider.ContainerStateStopped}, 500},
+			{"running", &provider.ContainerInfo{ID: "running", State: provider.ContainerStateRunning}, 200},
+		}
+
+		for _, tc := range testCases {
+			local := tc // because scope leaks :(
+			Context(fmt.Sprintf("Create new shell for container %v", local.id), func() {
+				BeforeEach(func() {
+					if local.container != nil {
+						prov.Containers = []*provider.ContainerInfo{local.container}
+					}
+					doRequest(local.id)
+				})
+
+				It("responds to the request", func() {
+					Expect(res.Code).To(Equal(local.statusCode))
+					if local.statusCode == 200 {
+						var m map[string]string
+						json.Unmarshal(res.Body.Bytes(), &m)
+						Expect(m).To(HaveKey("id"))
+					}
+				})
+			})
+		}
+	})
 })
