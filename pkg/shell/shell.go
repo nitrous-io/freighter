@@ -40,6 +40,18 @@ func NewShell(id, username string) (*Shell, error) {
 	return s, nil
 }
 
+func OpenShell(id, username string, width, height int) (*Shell, error) {
+	s, err := NewShell(id, username)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.Open(width, height); err != nil {
+		s.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
 type Shell struct {
 	username string
 	id       string

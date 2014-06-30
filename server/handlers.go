@@ -172,17 +172,12 @@ func (s *Server) createShell(w http.ResponseWriter, r *http.Request) error {
 	width := getFormInt(r, "width")
 	height := getFormInt(r, "height")
 
-	shell, err := shell.NewShell(id, username)
+	shell, err := shell.OpenShell(id, username, width, height)
 	if err != nil {
 		return err
 	}
 	shellId := randomString()
 	s.shells[shellId] = shell
-
-	if err := shell.Open(width, height); err != nil {
-		shell.Close()
-		return err
-	}
 	s.respondEncodeJson(w, http.StatusOK, map[string]interface{}{"id": shellId})
 	return nil
 }
