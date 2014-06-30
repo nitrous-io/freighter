@@ -177,17 +177,17 @@ func (s *Server) createShell(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	shellId := randomString()
-	s.shells[shellId] = shell
-	s.respondEncodeJson(w, http.StatusOK, map[string]interface{}{"id": shellId})
+	shellID := randomString()
+	s.shells[shellID] = shell
+	s.respondEncodeJson(w, http.StatusOK, map[string]interface{}{"id": shellID})
 	return nil
 }
 
 func (s *Server) attachShell(w http.ResponseWriter, r *http.Request) error {
-	shellId := mux.Vars(r)["id"]
-	shell, ok := s.shells[shellId]
+	shellID := mux.Vars(r)["id"]
+	shell, ok := s.shells[shellID]
 	if !ok {
-		return fmt.Errorf("Invalid shell %v", shellId)
+		return fmt.Errorf("Invalid shell %v", shellID)
 	}
 
 	stdin, stdout, err := hijackServer(w)
@@ -215,10 +215,10 @@ func (s *Server) attachShell(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) error {
-	shellId := mux.Vars(r)["id"]
-	shell, ok := s.shells[shellId]
+	shellID := mux.Vars(r)["id"]
+	shell, ok := s.shells[shellID]
 	if !ok {
-		return fmt.Errorf("Invalid shell %v", shellId)
+		return fmt.Errorf("Invalid shell %v", shellID)
 	}
 
 	width := getFormInt(r, "width")
