@@ -143,7 +143,7 @@ func (s *Shell) fd() uintptr {
 	return s.term.Fd()
 }
 
-// Go is a basic promise implementation: it wraps calls a function in a goroutine,
+// basic promise implementation: it wraps calls a function in a goroutine,
 // and returns a channel which will later return the function's return value.
 func promise(f func() error) chan error {
 	ch := make(chan error, 1)
