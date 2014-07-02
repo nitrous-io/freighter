@@ -47,9 +47,9 @@ func TestNewShell(t *testing.T) {
 		case tc.expectedError && err != nil:
 			continue
 		case tc.expectedError && err == nil:
-			t.Fatalf("Expected err but pass %+v", tc)
+			t.Errorf("Expected err but pass %+v", tc)
 		case tc.expectedId != s.id || tc.expectedUsername != s.username:
-			t.Fatalf("Incorrect id or username %+v %+v", tc, s)
+			t.Errorf("Incorrect id or username %+v %+v", tc, s)
 		}
 	}
 }
@@ -74,10 +74,10 @@ func TestShellOpen(t *testing.T) {
 			t.Fatalf("Unexpected error %v", err)
 		}
 		if tc.ew > 0 && tc.ew != int(ws.Width) {
-			t.Fatalf("Incorrect term width %+v %+v", tc, ws)
+			t.Errorf("Incorrect term width %+v %+v", tc, ws)
 		}
 		if tc.eh > 0 && tc.eh != int(ws.Height) {
-			t.Fatalf("Incorrect term height %+v %+v", tc, ws)
+			t.Errorf("Incorrect term height %+v %+v", tc, ws)
 		}
 		s.Close()
 	}
@@ -108,7 +108,7 @@ func TestShellAttach(t *testing.T) {
 		t.Fatal("timed out")
 	case data := <-written:
 		if string(data) != "echo" {
-			t.Fatalf("Unexpected data %v", string(data))
+			t.Errorf("Unexpected data %v", string(data))
 		}
 		stdinW.Close()
 		stdoutW.Close()
@@ -136,7 +136,7 @@ func TestShellResize(t *testing.T) {
 		}
 		ws, err := term.GetWinsize(s.fd())
 		if err != nil || int(ws.Width) != tc.ew || int(ws.Height) != tc.eh {
-			t.Fatalf("Unexpected size %v %v with test %+v", ws, err, tc)
+			t.Errorf("Unexpected size %v %v with test %+v", ws, err, tc)
 		}
 	}
 }
