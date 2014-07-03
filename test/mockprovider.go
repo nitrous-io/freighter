@@ -25,23 +25,11 @@ type MockProvider struct {
 	RestartCalled bool
 	RestartError  error
 
-	ListPublicKeysCalled bool
-	ListPublicKeysError  error
-
-	AddPublicKeysCalled bool
-	AddPublicKeysError  error
-
-	RemovePublicKeyCalled bool
-	RemovePublicKeyError  error
-
-	ReceivedID             string
-	ReceivedName           string
-	ReceivedImage          string
-	ReceivedPublicKeys     []string
-	ReceivedKeyFingerprint string
+	ReceivedID    string
+	ReceivedName  string
+	ReceivedImage string
 
 	Containers []*provider.ContainerInfo
-	PublicKeys map[string]string
 }
 
 func (p *MockProvider) List() ([]*provider.ContainerInfo, error) {
@@ -51,11 +39,10 @@ func (p *MockProvider) List() ([]*provider.ContainerInfo, error) {
 	return p.Containers, nil
 }
 
-func (p *MockProvider) Create(name string, image string, publicKeys []string) (*provider.ContainerInfo, error) {
+func (p *MockProvider) Create(name string, image string) (*provider.ContainerInfo, error) {
 	p.CreateCalled = true
 	p.ReceivedName = name
 	p.ReceivedImage = image
-	p.ReceivedPublicKeys = publicKeys
 	return p.CreateContainerInfo, p.CreateError
 }
 
@@ -103,32 +90,11 @@ func (p *MockProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 	info, _ := p.GetInfo(id)
 	if info != nil {
 		info.Host = ""
-		info.SSHPort = 0
 		info.State = ""
 	}
 	p.TerminateCalled = true
 	p.ReceivedID = id
 	return info, p.TerminateError
-}
-
-func (p *MockProvider) ListPublicKeys(id string) (map[string]string, error) {
-	p.ListPublicKeysCalled = true
-	p.ReceivedID = id
-	return p.PublicKeys, p.ListPublicKeysError
-}
-
-func (p *MockProvider) AddPublicKeys(id string, publicKeys []string) error {
-	p.AddPublicKeysCalled = true
-	p.ReceivedID = id
-	p.ReceivedPublicKeys = publicKeys
-	return p.AddPublicKeysError
-}
-
-func (p *MockProvider) RemovePublicKey(id string, keyFingerprint string) error {
-	p.RemovePublicKeyCalled = true
-	p.ReceivedID = id
-	p.ReceivedKeyFingerprint = keyFingerprint
-	return p.RemovePublicKeyError
 }
 
 func (p *MockProvider) IsNotFoundError(err error) bool {

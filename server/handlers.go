@@ -26,11 +26,6 @@ func (s *Server) createContainer(w http.ResponseWriter, r *http.Request) {
 	image := r.FormValue("image")
 	callbackURL := r.FormValue("callback_url")
 	state := r.FormValue("state")
-	publicKeys := r.PostForm["public_key[]"]
-
-	if publicKeys == nil {
-		publicKeys = []string{}
-	}
 
 	if name == "" || !provider.IsValidName(name) {
 		s.respond(w, 422, []byte(`{"error":"name is not valid"}`))
@@ -53,7 +48,7 @@ func (s *Server) createContainer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		info, err := s.provider.Create(name, image, publicKeys)
+		info, err := s.provider.Create(name, image)
 		s.invokeCallback(callbackURL, state, map[string]interface{}{
 			"result":    "created",
 			"container": info,
@@ -89,64 +84,4 @@ func (s *Server) stopContainer(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) restartContainer(w http.ResponseWriter, r *http.Request) {
 	s.performContainerControl(w, r, s.provider.Restart, "restarted")
-}
-
-func (s *Server) listPublicKeys(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
-	allPubKeys, err := s.provider.ListPublicKeys(id)
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
-
-	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"public_keys": allPubKeys})
-}
-
-func (s *Server) addPublicKeys(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
-	err := r.ParseForm()
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
-
-	publicKeys := r.PostForm["public_key[]"]
-
-	if publicKeys == nil {
-		s.respond(w, 422, []byte(`{"error":"public_key[] is missing"}`))
-		return
-	}
-
-	err = s.provider.AddPublicKeys(id, publicKeys)
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
-
-	allPubKeys, err := s.provider.ListPublicKeys(id)
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
-
-	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"public_keys": allPubKeys})
-}
-
-func (s *Server) removePublicKey(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
-	keyFingerprint := mux.Vars(r)["key_fingerprint"]
-
-	err := s.provider.RemovePublicKey(id, keyFingerprint)
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
-
-	allPubKeys, err := s.provider.ListPublicKeys(id)
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
-
-	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"public_keys": allPubKeys})
 }

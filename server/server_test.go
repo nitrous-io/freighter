@@ -1,13 +1,11 @@
 package server_test
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -79,8 +77,8 @@ var _ = Describe("server", func() {
 		Context("when there exists containers", func() {
 			BeforeEach(func() {
 				prov.Containers = []*provider.ContainerInfo{
-					{ID: "aaa", Name: "foo", Image: "ubuntu", Host: "1.2.3.4", SSHPort: 10000, State: provider.ContainerStateRunning},
-					{ID: "bbb", Name: "bar", Image: "centos", Host: "1.2.3.5", SSHPort: 10001, State: provider.ContainerStateStopped},
+					{ID: "aaa", Name: "foo", Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning},
+					{ID: "bbb", Name: "bar", Image: "centos", Host: "1.2.3.5", State: provider.ContainerStateStopped},
 				}
 				doRequest()
 			})
@@ -88,8 +86,8 @@ var _ = Describe("server", func() {
 			It("responds with 200 ok with container info array", func() {
 				Expect(res.Code).To(Equal(http.StatusOK))
 				Expect(res.Body.String()).To(MatchJSON(`{"containers":[
-				  {"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","ssh_port":10000,"state":"running"},
-					{"id":"bbb","name":"bar","image":"centos","host":"1.2.3.5","ssh_port":10001,"state":"stopped"}
+				  {"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","state":"running"},
+					{"id":"bbb","name":"bar","image":"centos","host":"1.2.3.5","state":"stopped"}
 				]}`))
 			})
 		})
@@ -142,9 +140,6 @@ var _ = Describe("server", func() {
 				Expect(prov.CreateCalled).To(BeTrue())
 				Expect(prov.ReceivedName).To(Equal(name))
 				Expect(prov.ReceivedImage).To(Equal(image))
-				Expect(prov.ReceivedPublicKeys).To(HaveLen(2))
-				Expect(prov.ReceivedPublicKeys).To(ContainElement(publicKey))
-				Expect(prov.ReceivedPublicKeys).To(ContainElement(publicKey2))
 			})
 
 			Context("when provider.Create()", func() {
@@ -165,7 +160,7 @@ var _ = Describe("server", func() {
 
 				Context("returns a container info with no error", func() {
 					BeforeEach(func() {
-						prov.CreateContainerInfo = &provider.ContainerInfo{ID: "aaa", Name: name, Image: "ubuntu", Host: "1.2.3.4", SSHPort: 10000, State: provider.ContainerStateRunning}
+						prov.CreateContainerInfo = &provider.ContainerInfo{ID: "aaa", Name: name, Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning}
 						doRequest()
 					})
 
@@ -175,7 +170,7 @@ var _ = Describe("server", func() {
 						Expect(cb.InvokeCalled).To(BeTrue())
 						Expect(cb.To).To(Equal(callbackURL))
 						Expect(cb.Payload).To(MatchJSON(`{"result":"created", "container":{
-							"id":"aaa","name":"fragrant-wind-69","image":"ubuntu","host":"1.2.3.4","ssh_port":10000,"state":"running"
+							"id":"aaa","name":"fragrant-wind-69","image":"ubuntu","host":"1.2.3.4","state":"running"
 						}, "state": "` + state + `"}`))
 					})
 				})
@@ -225,7 +220,7 @@ var _ = Describe("server", func() {
 		Context("when a given name is already taken", func() {
 			BeforeEach(func() {
 				prov.Containers = []*provider.ContainerInfo{
-					{ID: "aaa", Name: name, Image: "ubuntu", Host: "1.2.3.4", SSHPort: 10000, State: provider.ContainerStateRunning},
+					{ID: "aaa", Name: name, Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning},
 				}
 				doRequest()
 			})
@@ -246,7 +241,7 @@ var _ = Describe("server", func() {
 	Describe("GET /containers/:container_id", func() {
 		BeforeEach(func() {
 			prov.Containers = []*provider.ContainerInfo{
-				{ID: "aaa", Name: "foo", Image: "ubuntu", Host: "1.2.3.4", SSHPort: 10000, State: provider.ContainerStateRunning},
+				{ID: "aaa", Name: "foo", Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning},
 			}
 		})
 
@@ -264,7 +259,7 @@ var _ = Describe("server", func() {
 			It("responds with 200 ok with container information", func() {
 				Expect(res.Code).To(Equal(http.StatusOK))
 				Expect(res.Body.String()).To(MatchJSON(`{"container":{
-					"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","ssh_port":10000,"state":"running"
+					"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","state":"running"
 				}}`))
 			})
 		})
@@ -291,7 +286,6 @@ var _ = Describe("server", func() {
 			name             = "foobar"
 			image            = "ubuntu"
 			host             = "1.2.3.4"
-			sshPort          = uint16(10000)
 			callbackURL      = "http://www.example.com/cb"
 			state            string
 			params           *url.Values
@@ -299,7 +293,7 @@ var _ = Describe("server", func() {
 
 		BeforeEach(func() {
 			prov.Containers = []*provider.ContainerInfo{
-				{ID: id, Name: name, Image: image, Host: host, SSHPort: sshPort},
+				{ID: id, Name: name, Image: image, Host: host},
 			}
 			params = &url.Values{}
 			params.Set("callback_url", callbackURL)
@@ -378,7 +372,6 @@ var _ = Describe("server", func() {
 						"name": "` + name + `",
 						"image": "` + image + `",
 						"host": "",
-						"ssh_port": 0,
 						"state": ""
 					},
 					"state": "` + state + `"
@@ -405,7 +398,6 @@ var _ = Describe("server", func() {
 						"name": "` + name + `",
 						"image": "` + image + `",
 						"host": "` + host + `",
-						"ssh_port": ` + strconv.Itoa(int(sshPort)) + `,
 						"state": "running"
 					},
 					"state": "` + state + `"
@@ -432,7 +424,6 @@ var _ = Describe("server", func() {
 						"name": "` + name + `",
 						"image": "` + image + `",
 						"host": "",
-						"ssh_port": ` + strconv.Itoa(int(sshPort)) + `,
 						"state": "stopped"
 					},
 					"state": "` + state + `"
@@ -459,7 +450,6 @@ var _ = Describe("server", func() {
 						"name": "` + name + `",
 						"image": "` + image + `",
 						"host": "` + host + `",
-						"ssh_port": ` + strconv.Itoa(int(sshPort)) + `,
 						"state": "running"
 					},
 					"state": "` + state + `"
@@ -473,295 +463,6 @@ var _ = Describe("server", func() {
 			})
 
 			itWorks()
-		})
-	})
-
-	Describe("GET /containers/:container_id/public_keys", func() {
-		var (
-			id           = "cafebabe"
-			publicKey1   = "ssh-rsa Foo"
-			publicKey2   = "ssh-rsa Bar"
-			publicKey3   = "ssh-dsa Baz"
-			fingerprint1 = "11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11"
-			fingerprint2 = "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22"
-			fingerprint3 = "33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33"
-		)
-
-		doRequest := func() {
-			req, err = NewRequest("GET", fmt.Sprintf("/containers/%v/public_keys", id), nil)
-			Expect(err).To(BeNil())
-			handler.ServeHTTP(res, req)
-		}
-
-		It("calls provider.ListPublicKeys()", func() {
-			Expect(prov.ListPublicKeysCalled).To(BeFalse())
-			doRequest()
-			Expect(prov.ListPublicKeysCalled).To(BeTrue())
-			Expect(prov.ReceivedID).To(Equal(id))
-		})
-
-		Context("when provider.ListPublicKeys() fails with error", func() {
-			Context("because no such container exists", func() {
-				BeforeEach(func() {
-					prov.ListPublicKeysError = ErrMockProviderContainerNotFound
-					doRequest()
-				})
-
-				It("responds with 404 not found", func() {
-					Expect(res.Code).To(Equal(http.StatusNotFound))
-					Expect(res.Body.String()).To(MatchJSON(`{"error":"no such container"}`))
-				})
-			})
-
-			Context("because of some unknown error", func() {
-				BeforeEach(func() {
-					prov.ListPublicKeysError = errors.New("unknown error")
-					doRequest()
-				})
-
-				It("responds with 500 internal server error with error json", func() {
-					Expect(res.Code).To(Equal(http.StatusInternalServerError))
-					Expect(res.Body.String()).To(MatchJSON(`{"error":"unknown error"}`))
-				})
-			})
-		})
-
-		Context("when provider.ListPublicKeys() succeeds", func() {
-			BeforeEach(func() {
-				prov.PublicKeys = map[string]string{fingerprint1: publicKey1, fingerprint2: publicKey2, fingerprint3: publicKey3}
-				doRequest()
-			})
-
-			It("responds with 200 ok with public keys json", func() {
-				Expect(res.Code).To(Equal(http.StatusOK))
-				j, _ := json.Marshal(map[string]interface{}{
-					"public_keys": prov.PublicKeys,
-				})
-
-				Expect(res.Body.String()).To(MatchJSON(string(j)))
-			})
-		})
-	})
-
-	Describe("POST /containers/:container_id/public_keys", func() {
-		var (
-			params     *url.Values
-			id         = "cafebabe"
-			publicKey  = "ssh-rsa Foo"
-			publicKey2 = "ssh-rsa Bar"
-		)
-
-		BeforeEach(func() {
-			params = &url.Values{}
-			params.Set("public_key[]", publicKey)
-			params.Add("public_key[]", publicKey2)
-		})
-
-		doRequest := func() {
-			req, err = NewFormRequest("POST", fmt.Sprintf("/containers/%v/public_keys", id), params)
-			Expect(err).To(BeNil())
-			handler.ServeHTTP(res, req)
-		}
-
-		Context("when params are valid", func() {
-			It("calls provider.AddPublicKeys()", func() {
-				Expect(prov.AddPublicKeysCalled).To(BeFalse())
-				doRequest()
-				Expect(prov.AddPublicKeysCalled).To(BeTrue())
-				Expect(prov.ReceivedID).To(Equal(id))
-				Expect(prov.ReceivedPublicKeys).To(HaveLen(2))
-				Expect(prov.ReceivedPublicKeys).To(ContainElement(publicKey))
-				Expect(prov.ReceivedPublicKeys).To(ContainElement(publicKey2))
-			})
-
-			Context("when provider.AddPublicKeys() fails with error", func() {
-				Context("because no such container exists", func() {
-					BeforeEach(func() {
-						prov.AddPublicKeysError = ErrMockProviderContainerNotFound
-						doRequest()
-					})
-
-					It("responds with 404 not found", func() {
-						Expect(res.Code).To(Equal(http.StatusNotFound))
-						Expect(res.Body.String()).To(MatchJSON(`{"error":"no such container"}`))
-					})
-				})
-
-				Context("because of some unknown error", func() {
-					BeforeEach(func() {
-						prov.AddPublicKeysError = errors.New("unknown error")
-						doRequest()
-					})
-
-					It("responds with 500 internal server error with error json", func() {
-						Expect(res.Code).To(Equal(http.StatusInternalServerError))
-						Expect(res.Body.String()).To(MatchJSON(`{"error":"unknown error"}`))
-					})
-				})
-			})
-
-			Context("when provider.AddPublicKeys() succeeds", func() {
-				Context("when provider.ListPublicKeys() fails with error", func() {
-					Context("because no such container exists", func() {
-						BeforeEach(func() {
-							prov.ListPublicKeysError = ErrMockProviderContainerNotFound
-							doRequest()
-						})
-
-						It("responds with 404 not found", func() {
-							Expect(res.Code).To(Equal(http.StatusNotFound))
-							Expect(res.Body.String()).To(MatchJSON(`{"error":"no such container"}`))
-						})
-					})
-
-					Context("because of some unknown error", func() {
-						BeforeEach(func() {
-							prov.ListPublicKeysError = errors.New("unknown error")
-							doRequest()
-						})
-
-						It("responds with 500 internal server error with error json", func() {
-							Expect(res.Code).To(Equal(http.StatusInternalServerError))
-							Expect(res.Body.String()).To(MatchJSON(`{"error":"unknown error"}`))
-						})
-					})
-				})
-
-				Context("when provider.ListPublicKeys() succeeds", func() {
-					fingerprint1 := "11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11"
-					fingerprint2 := "22:22:22:22:22:22:22:22:22:22:22:22:22:22:22:22"
-					fingerprint3 := "33:33:33:33:33:33:33:33:33:33:33:33:33:33:33:33"
-					publicKey3 := "ssh-dsa Baz"
-
-					BeforeEach(func() {
-						prov.PublicKeys = map[string]string{fingerprint1: publicKey, fingerprint2: publicKey2, fingerprint3: publicKey3}
-						doRequest()
-					})
-
-					It("responds with 200 ok with public keys json", func() {
-						Expect(prov.ListPublicKeysCalled).To(BeTrue())
-						Expect(prov.ReceivedID).To(Equal(id))
-						Expect(res.Code).To(Equal(http.StatusOK))
-						j, _ := json.Marshal(map[string]interface{}{
-							"public_keys": prov.PublicKeys,
-						})
-
-						Expect(res.Body.String()).To(MatchJSON(string(j)))
-					})
-				})
-			})
-		})
-
-		Context("when public_key[] param is missing", func() {
-			BeforeEach(func() {
-				params.Del("public_key[]")
-				doRequest()
-			})
-
-			It("responds with 422 unprocessable entity", func() {
-				Expect(res.Code).To(Equal(422))
-				Expect(res.Body.String()).To(MatchJSON(`{"error":"public_key[] is missing"}`))
-			})
-
-			It("does not call provider.AddPublicKeys()", func() {
-				Expect(prov.AddPublicKeysCalled).To(BeFalse())
-			})
-		})
-	})
-
-	Describe("DELETE /containers/:container_id/public_keys/:key_fingerprint", func() {
-		var (
-			params      *url.Values
-			id          = "cafebabe"
-			fingerprint = "11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11"
-		)
-
-		doRequest := func() {
-			req, err = NewRequest("DELETE", fmt.Sprintf("/containers/%v/public_keys/%v", id, fingerprint), params)
-			Expect(err).To(BeNil())
-			handler.ServeHTTP(res, req)
-		}
-
-		It("calls provider.RemovePublicKey()", func() {
-			Expect(prov.RemovePublicKeyCalled).To(BeFalse())
-			doRequest()
-			Expect(prov.RemovePublicKeyCalled).To(BeTrue())
-			Expect(prov.ReceivedID).To(Equal(id))
-			Expect(prov.ReceivedKeyFingerprint).To(Equal(fingerprint))
-		})
-
-		Context("when provider.RemovePublicKey() fails with error", func() {
-			Context("because no such container exists", func() {
-				BeforeEach(func() {
-					prov.RemovePublicKeyError = ErrMockProviderContainerNotFound
-					doRequest()
-				})
-
-				It("responds with 404 not found", func() {
-					Expect(res.Code).To(Equal(http.StatusNotFound))
-					Expect(res.Body.String()).To(MatchJSON(`{"error":"no such container"}`))
-				})
-			})
-
-			Context("because of some unknown error", func() {
-				BeforeEach(func() {
-					prov.RemovePublicKeyError = errors.New("unknown error")
-					doRequest()
-				})
-
-				It("responds with 500 internal server error with error json", func() {
-					Expect(res.Code).To(Equal(http.StatusInternalServerError))
-					Expect(res.Body.String()).To(MatchJSON(`{"error":"unknown error"}`))
-				})
-			})
-		})
-
-		Context("when provider.RemovePublicKey() succeeds", func() {
-			Context("when provider.ListPublicKeys() fails with error", func() {
-				Context("because no such container exists", func() {
-					BeforeEach(func() {
-						prov.ListPublicKeysError = ErrMockProviderContainerNotFound
-						doRequest()
-					})
-
-					It("responds with 404 not found", func() {
-						Expect(res.Code).To(Equal(http.StatusNotFound))
-						Expect(res.Body.String()).To(MatchJSON(`{"error":"no such container"}`))
-					})
-				})
-
-				Context("because of some unknown error", func() {
-					BeforeEach(func() {
-						prov.ListPublicKeysError = errors.New("unknown error")
-						doRequest()
-					})
-
-					It("responds with 500 internal server error with error json", func() {
-						Expect(res.Code).To(Equal(http.StatusInternalServerError))
-						Expect(res.Body.String()).To(MatchJSON(`{"error":"unknown error"}`))
-					})
-				})
-			})
-
-			Context("when provider.ListPublicKeys() succeeds", func() {
-				publicKey := "ssh-dsa Baz"
-
-				BeforeEach(func() {
-					prov.PublicKeys = map[string]string{fingerprint: publicKey}
-					doRequest()
-				})
-
-				It("responds with 200 ok with public keys json", func() {
-					Expect(prov.ListPublicKeysCalled).To(BeTrue())
-					Expect(prov.ReceivedID).To(Equal(id))
-					Expect(res.Code).To(Equal(http.StatusOK))
-					j, _ := json.Marshal(map[string]interface{}{
-						"public_keys": prov.PublicKeys,
-					})
-
-					Expect(res.Body.String()).To(MatchJSON(string(j)))
-				})
-			})
 		})
 	})
 })

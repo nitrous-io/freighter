@@ -1,10 +1,7 @@
 package docker_test
 
 import (
-	"io/ioutil"
-	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -51,16 +48,10 @@ var _ = Describe("provider/docker", func() {
 
 	Describe(".Create()", func() {
 		var (
-			name         string
-			id           string
-			host         string
-			port         uint16
-			info         *provider.ContainerInfo
-			pubkey1      = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQCxCeR/jJna6xXELDV8HF51QQPbj++JNDE4W/nqLyhzRTEDDnAfyp8gXW/EXXos8w5XXLak6eUDXE/QI6o8blX39RYoT47u45v4b2scN0ZiS5McmESo193KwWH3gXHbnHWywzPy7+GrRF3nHm/uidvp0tqh4ywqIZujaMjST1sIOQ== test@example.com"
-			pubkey2      string
-			fingerprint1 = "f7:de:4d:6f:54:6b:b9:d5:78:a9:62:15:e2:ad:ec:bb"
-			fingerprint2 string
-			sshkeypath   string
+			name string
+			id   string
+			host string
+			info *provider.ContainerInfo
 		)
 
 		getID := func(name string) string {
@@ -75,53 +66,26 @@ var _ = Describe("provider/docker", func() {
 			return strings.TrimSpace(string(host))
 		}
 
-		getPort := func(id string) uint16 {
-			port, err := exec.Command("bash", "-c", `docker inspect -f {{.NetworkSettings.Ports}} `+id+` | sed 's/.*HostPort:\([0-9]*\).*/\1/'`).CombinedOutput()
-			Expect(err).To(BeNil())
-			n, err := strconv.Atoi(strings.TrimSpace(string(port)))
-			Expect(err).To(BeNil())
-			return uint16(n)
-		}
-
 		BeforeEach(func() {
 			var err error
 			name = RandomName("freightertest")
 
-			userPubkey := TestSSHPubKey
-			pubkey2 = strings.TrimSpace(string(userPubkey))
-			fingerprint2, err = util.Md5Fingerprint(pubkey2)
-			Expect(err).To(BeNil())
-
-			sshkeypath = TempFile("")
-			ioutil.WriteFile(sshkeypath, []byte(TestSSHPrivKey), 0600)
-
-			info, err = prov.Create(name, "ubuntu-upstart:trusty", []string{pubkey1, pubkey2})
+			info, err = prov.Create(name, "ubuntu-upstart:trusty")
 			Expect(err).To(BeNil())
 			id = getID(name)
 			host = getHost(id)
-			port = getPort(id)
 		})
 
 		AfterEach(func() {
 			cleanUpContainer(name)
-			os.Remove(sshkeypath)
 		})
-
-		expectSSHToWork := func() {
-			time.Sleep(1 * time.Second)
-			out, err := exec.Command("ssh", "action@localhost", "-i", sshkeypath, "-p", strconv.Itoa(int(port)), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
-			Expect(out).To(ContainSubstring("success"))
-			Expect(err).To(BeNil())
-		}
 
 		It("creates a container successfully", func() {
 			Expect(info.ID).To(Equal(id))
 			Expect(info.Name).To(Equal(name))
 			Expect(info.Image).To(Equal(namespace + "." + name))
 			Expect(info.Host).To(Equal(host))
-			Expect(info.SSHPort).To(Equal(port))
 			Expect(info.State).To(Equal(provider.ContainerStateRunning))
-			expectSSHToWork()
 		})
 
 		Context("after container is created", func() {
@@ -143,7 +107,7 @@ var _ = Describe("provider/docker", func() {
 					Expect(err).To(BeNil())
 
 					// create another container
-					container2Info, err = prov.Create(container2Name, "ubuntu-upstart:trusty", []string{})
+					container2Info, err = prov.Create(container2Name, "ubuntu-upstart:trusty")
 					Expect(err).To(BeNil())
 
 					// create a container not managed by freighter
@@ -164,21 +128,19 @@ var _ = Describe("provider/docker", func() {
 
 						Expect(list).To(HaveLen(2))
 						Expect(list).To(ContainElement(&provider.ContainerInfo{
-							ID:      id,
-							Name:    name,
-							Image:   namespace + "." + name,
-							Host:    "",
-							SSHPort: port,
-							State:   provider.ContainerStateStopped,
+							ID:    id,
+							Name:  name,
+							Image: namespace + "." + name,
+							Host:  "",
+							State: provider.ContainerStateStopped,
 						}))
 
 						Expect(list).To(ContainElement(&provider.ContainerInfo{
-							ID:      container2Info.ID,
-							Name:    container2Name,
-							Host:    container2Info.Host,
-							Image:   namespace + "." + container2Name,
-							SSHPort: container2Info.SSHPort,
-							State:   provider.ContainerStateRunning,
+							ID:    container2Info.ID,
+							Name:  container2Name,
+							Host:  container2Info.Host,
+							Image: namespace + "." + container2Name,
+							State: provider.ContainerStateRunning,
 						}))
 					})
 				})
@@ -192,7 +154,6 @@ var _ = Describe("provider/docker", func() {
 							Expect(info.Name).To(Equal(name))
 							Expect(info.Image).To(Equal(namespace + "." + name))
 							Expect(info.Host).To(Equal(""))
-							Expect(info.SSHPort).To(Equal(port))
 							Expect(info.State).To(Equal(provider.ContainerStateStopped))
 
 							info, err = prov.GetInfo(container2Info.ID)
@@ -201,7 +162,6 @@ var _ = Describe("provider/docker", func() {
 							Expect(info.Name).To(Equal(container2Name))
 							Expect(info.Image).To(Equal(namespace + "." + container2Name))
 							Expect(info.Host).To(Equal(container2Info.Host))
-							Expect(info.SSHPort).To(Equal(container2Info.SSHPort))
 							Expect(info.State).To(Equal(provider.ContainerStateRunning))
 						})
 					})
@@ -223,7 +183,6 @@ var _ = Describe("provider/docker", func() {
 					out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 					Expect(err).To(BeNil())
 					Expect(out).To(ContainSubstring("true"))
-					expectSSHToWork()
 				}
 
 				expectContainerInfoToHaveBeenReturned := func() {
@@ -232,7 +191,6 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Name).To(Equal(name))
 					Expect(info.Image).To(Equal(namespace + "." + name))
 					Expect(info.Host).To(Equal(host))
-					Expect(info.SSHPort).To(Equal(port))
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
 				}
 
@@ -278,7 +236,6 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Name).To(Equal(name))
 					Expect(info.Image).To(Equal(namespace + "." + name))
 					Expect(info.Host).To(Equal(""))
-					Expect(info.SSHPort).To(Equal(port))
 					Expect(info.State).To(Equal(provider.ContainerStateStopped))
 				}
 
@@ -315,7 +272,6 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Name).To(Equal(name))
 					Expect(info.Image).To(Equal(namespace + "." + name))
 					Expect(info.Host).To(Equal(host))
-					Expect(info.SSHPort).To(Equal(port))
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
 				}
 
@@ -336,7 +292,6 @@ var _ = Describe("provider/docker", func() {
 						Expect(err).To(BeNil())
 						newStartTime, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(out)))
 						Expect(prevStartTime.Before(newStartTime)).To(BeTrue())
-						expectSSHToWork()
 					})
 				})
 
@@ -354,7 +309,6 @@ var _ = Describe("provider/docker", func() {
 						out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 						Expect(err).To(BeNil())
 						Expect(out).To(ContainSubstring("true"))
-						expectSSHToWork()
 					})
 				})
 			})
@@ -362,7 +316,7 @@ var _ = Describe("provider/docker", func() {
 			Describe(".Terminate()", func() {
 				var info *provider.ContainerInfo
 
-				expectContainerToBeTerminatedAndPortReleased := func() {
+				expectContainerToBeTerminated := func() {
 					out, err := exec.Command("docker", "inspect", id).CombinedOutput()
 					Expect(err).NotTo(BeNil())
 					Expect(out).To(ContainSubstring("No such image or container"))
@@ -374,7 +328,6 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Name).To(Equal(name))
 					Expect(info.Image).To(Equal(namespace + "." + name))
 					Expect(info.Host).To(Equal(""))
-					Expect(info.SSHPort).To(Equal(uint16(0)))
 					Expect(info.State).To(Equal(""))
 				}
 
@@ -386,7 +339,7 @@ var _ = Describe("provider/docker", func() {
 
 				Context("when the container is running", func() {
 					It("terminates the container", func() {
-						expectContainerToBeTerminatedAndPortReleased()
+						expectContainerToBeTerminated()
 						expectContainerInfoToHaveBeenReturned()
 					})
 				})
@@ -398,161 +351,8 @@ var _ = Describe("provider/docker", func() {
 					})
 
 					It("terminates the container", func() {
-						expectContainerToBeTerminatedAndPortReleased()
+						expectContainerToBeTerminated()
 						expectContainerInfoToHaveBeenReturned()
-					})
-				})
-			})
-
-			Describe(".ListPublicKeys()", func() {
-				itWorks := func() {
-					It("returns list of pub keys and the corresponding fingerprints", func() {
-						pubkeys, err := prov.ListPublicKeys(id)
-						Expect(err).To(BeNil())
-						Expect(pubkeys).To(Equal(map[string]string{
-							fingerprint1: pubkey1,
-							fingerprint2: pubkey2,
-						}))
-					})
-				}
-
-				Context("when the container is running", func() {
-					itWorks()
-				})
-
-				Context("when the container is stopped", func() {
-					BeforeEach(func() {
-						err := exec.Command("docker", "stop", id).Run()
-						Expect(err).To(BeNil())
-					})
-
-					itWorks()
-				})
-			})
-
-			Describe(".AddPublicKeys()", func() {
-				pubkey3 := "ssh-dss AAAAB3NzaC1kc3MAAACBAKPiMSg6vvWZAK1a+Vj+yPH0kRpCDUqhNCyPJd8yIfvs8c+uGgnXkDG6vW3gamyxkFilxgLvqW89NnvmcBRoAXkrT5e8uiciLJ2CqJuqZPHFNf3T298xFleh/43X5dxgS6CdODzrkreFe8XD1R1DozMgChU8wGVpQNQWGKU/x7xXAAAAFQCa8OP3WB4V2mNA/8cN7fj4gxDbLwAAAIEAhxHz0xu/EAWvq+nZ5CXnWZ2g++t1IEJcJWnTTIQakU+aZV0DxQ4hesrFiXllBX/oUTgr8ZlqYgqTy4+lHpXIhesNy3k9OjjU8/dYm9zZZw3TWIL64dAEp9L0xNZ7MFgOVvDwpjNqjUrbDCIujk7iZ+J/hFFoTqRxSeciX+cbusQAAACBAIcGybaGJ2Z4E21jR0iD05kNhJm97CJHavhH6fgxkeecVdXU2+k/DjLHTz7UfhbAtg6XqE0s5PVUgh0P/stQRGyosTmasYE3hTwwOXYQ2k/HLqM/ZGwEXW2kLSpi2MROowQf25wQrWmJBjTQ8mjG5jm0KOCX2jFf0QN3qTzVovSc vagrant@ubuntu-14"
-
-				Context("with valid public keys", func() {
-					var (
-						pubkey4      = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBIC/WqXhoJC0FSaocOrx/uyneeqH32CUNbva4L6PdY7mIZ99mTTpdREowMo1T3pvY46JxwL6X3stuhZmIYNJEc0="
-						fingerprint3 = "9b:e8:01:40:ff:35:c5:12:05:dc:cd:17:3e:a9:55:53"
-						fingerprint4 = "2a:43:73:52:6c:21:b5:5f:cc:cd:73:21:2b:05:50:de"
-					)
-
-					itWorks := func() {
-						It("adds given pub keys to the authorized_keys file for the container", func() {
-							err := prov.AddPublicKeys(id, []string{pubkey3, pubkey4, pubkey1}) // dupe key should be ignored
-							Expect(err).To(BeNil())
-							pubkeys, err := prov.ListPublicKeys(id)
-							Expect(err).To(BeNil())
-							Expect(pubkeys).To(Equal(map[string]string{
-								fingerprint1: pubkey1,
-								fingerprint2: pubkey2,
-								fingerprint3: pubkey3,
-								fingerprint4: pubkey4,
-							}))
-						})
-					}
-
-					Context("when the container is running", func() {
-						itWorks()
-					})
-
-					Context("when the container is stopped", func() {
-						BeforeEach(func() {
-							err := exec.Command("docker", "stop", id).Run()
-							Expect(err).To(BeNil())
-						})
-
-						itWorks()
-					})
-				})
-
-				Context("with an invalid public key in the mix", func() {
-					pubkey4 := "ssh-rsa S4!#AFLJKN*F@NF12f"
-
-					itDoesNotWork := func() {
-						It("does not add given pub keys to the authorized_keys file for the container", func() {
-							err := prov.AddPublicKeys(id, []string{pubkey3, pubkey4, pubkey1})
-							Expect(err).To(MatchError(util.ErrInvalidPublicKey))
-							pubkeys, err := prov.ListPublicKeys(id)
-							Expect(err).To(BeNil())
-							Expect(pubkeys).To(Equal(map[string]string{
-								fingerprint1: pubkey1,
-								fingerprint2: pubkey2,
-							}))
-						})
-					}
-
-					Context("when the container is running", func() {
-						itDoesNotWork()
-					})
-
-					Context("when the container is stopped", func() {
-						BeforeEach(func() {
-							err := exec.Command("docker", "stop", id).Run()
-							Expect(err).To(BeNil())
-						})
-
-						itDoesNotWork()
-					})
-				})
-			})
-
-			Describe(".RemovePublicKeys()", func() {
-				Context("when a pub key with a given fingerprint is found", func() {
-					itWorks := func() {
-						It("removes the matching pub key from the authorized_keys file", func() {
-							err := prov.RemovePublicKey(id, fingerprint1)
-							Expect(err).To(BeNil())
-							pubkeys, err := prov.ListPublicKeys(id)
-							Expect(err).To(BeNil())
-							Expect(pubkeys).To(Equal(map[string]string{
-								fingerprint2: pubkey2,
-							}))
-						})
-					}
-
-					Context("when the container is running", func() {
-						itWorks()
-					})
-
-					Context("when the container is stopped", func() {
-						BeforeEach(func() {
-							err := exec.Command("docker", "stop", id).Run()
-							Expect(err).To(BeNil())
-						})
-
-						itWorks()
-					})
-				})
-
-				Context("when a pub key with a given fingerprint is not found", func() {
-					itDoesNotWork := func() {
-						It("does nothing", func() {
-							err := prov.RemovePublicKey(id, "11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11")
-							Expect(err).To(BeNil())
-							pubkeys, err := prov.ListPublicKeys(id)
-							Expect(err).To(BeNil())
-							Expect(pubkeys).To(Equal(map[string]string{
-								fingerprint1: pubkey1,
-								fingerprint2: pubkey2,
-							}))
-						})
-					}
-
-					Context("when the container is running", func() {
-						itDoesNotWork()
-					})
-
-					Context("when the container is stopped", func() {
-						BeforeEach(func() {
-							err := exec.Command("docker", "stop", id).Run()
-							Expect(err).To(BeNil())
-						})
-
-						itDoesNotWork()
 					})
 				})
 			})

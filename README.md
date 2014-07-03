@@ -44,7 +44,6 @@ Content-Type: application/json; charset=utf-8
       "name": "foobar",
       "image": "freighter.foobar",
       "host": "1.2.3.4",
-      "ssh_port": 10000,
       "state": "running"
     },
     {
@@ -52,7 +51,6 @@ Content-Type: application/json; charset=utf-8
       "name": "bar",
       "image": "freighter.bar",
       "host": "1.2.3.5",
-      "ssh_port": 10001,
       "state": "stopped"
     }
   ]
@@ -108,7 +106,6 @@ Content-Type: application/json; charset=utf-8
     "name": "foobar",
     "image": "freighter.foobar",
     "host": "1.2.3.4",
-    "ssh_port": 10000,
     "state": "running"
   },
   "state": "xyz"
@@ -143,7 +140,6 @@ Content-Type: application/json; charset=utf-8
     "name":"foobar",
     "image":"freighter.foobar",
     "host":"1.2.3.4",
-    "ssh_port":60003,
     "state":"running"
   }
 }
@@ -196,7 +192,6 @@ Content-Type: application/json; charset=utf-8
     "name": "foobar",
     "image": "freighter.foobar",
     "host": "1.2.3.4",
-    "ssh_port": 10000,
     "state": "running"
   },
   "state": "xyz"
@@ -251,7 +246,6 @@ Content-Type: application/json; charset=utf-8
     "name": "foobar",
     "image": "freighter.foobar",
     "host": "",
-    "ssh_port": 10000,
     "state": "stopped"
   },
   "state": "xyz"
@@ -306,7 +300,6 @@ Content-Type: application/json; charset=utf-8
     "name": "foobar",
     "image": "freighter.foobar",
     "host": "1.2.3.4",
-    "ssh_port": 10000,
     "state": "running"
   },
   "state": "xyz"
@@ -365,100 +358,6 @@ Content-Type: application/json; charset=utf-8
 ```javascript
 { "error": "pc load letter", "state": "xyz" }
 ```
-
-### List authorized public keys for a container
-
-`GET /containers/(id)/public_keys`
-
-**Example request**:
-
-```
-GET /containers/2cf1503ed6a0/public_keys HTTP/1.1
-```
-
-**Example response**:
-
-```javascript
-HTTP/1.1 200 OK
-Content-Type: application/json; charset=utf-8
-
-{
-  "public_keys": {
-    "c1:fc:6d:29:ab:b8:03:57:c4:30:a6:b7:58:40:74:af": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCzRcsDraIFmeuZ+q6Ic9epAzXPy8WnkqZwLnauH9YBMPhrVQH6nnr/YSGxhYivnG1Qu0AirSUBAjFL7uD9YLeUhwwdKkhHa+bPPMpycmOopyafZyYAEIuZUwyjnK/2mniNJZ+YZhfBJ1z9Xh1hMIFtls/LP1Q7C25rIDg7l1khZ1cEV0mAzJjb4QBvqAt6TjC/YbUZ4/45rHRuQsu/RBhYpuffFwqlLHfjSO2i6TuJtNsEJ2kDDLooM/THf3J2TxObomusErPTgwAo8ya1GmEB5NuwysZx1posjPZIQwg0Q3RqLzMOPlnZpG2l/lvVfEU+iCcc246z4D4Ej9WnuWFR jihoon@ubuntu",
-    "e1:82:d8:93:44:20:cc:ff:c1:b8:0c:c3:82:bc:17:a9": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDMEj71VsgCsMiV3yRhAoot2vozfg2tFklv53MchMxjoQEebXCbdevKs92d9R+9c7hPG4h8uiTwozfC6IMYLNXQgQsUItmoWZqu16a6iQ5j7vmkkNPNR78moJIr/8ZQkg4K2I0382QVSU1JB3Sp2QrsTrwU46PtKiiASTJPTP5ynCpVECTwZKdcf6LfA9GXTpEgJJQkKRFrkGAJxMeZDRI4PBR5UDYGCOivIvGB7DQCLuEQax0T6M+FmMISU7UqXZ03947w0muunLhwMVPC76GI0OpYB+4hRmXjLv/LYDRES3rhB2T2fuq4iCXQ3SzI1o5bG1FPBoWprCBYWvbzHnjb jihoon@mac"
-  }
-}
-```
-
-**Status Codes**:
-
-- **200**  - no error
-- **404** - no such container
-
-### Add authorized public keys
-
-`POST /containers/(id)/public_keys`
-
-**Example request**:
-
-```
-POST /containers/2cf1503ed6a0/public_keys HTTP/1.1
-Content-Type: application/x-www-form-urlencoded
-
-public_key[]=ssh-rsa%20AAAAB3NzaC1yc2EAAAADAQABAAABAQCzRcsDraIFmeuZ%2Bq6Ic9epAzXPy8WnkqZwLnauH9YBMPhrVQH6nnr%2FYSGxhYivnG1Qu0AirSUBAjFL7uD9YLeUhwwdKkhHa%2BbPPMpycmOopyafZyYAEIuZUwyjnK%2F2mniNJZ%2BYZhfBJ1z9Xh1hMIFtls%2FLP1Q7C25rIDg7l1khZ1cEV0mAzJjb4QBvqAt6TjC%2FYbUZ4%2F45rHRuQsu%2FRBhYpuffFwqlLHfjSO2i6TuJtNsEJ2kDDLooM%2FTHf3J2TxObomusErPTgwAo8ya1GmEB5NuwysZx1posjPZIQwg0Q3RqLzMOPlnZpG2l%2FlvVfEU%2BiCcc246z4D4Ej9WnuWFR%20jihoon%40ubuntu&public_key[]=ssh-rsa%20AAAAB3NzaC1yc2EAAAADAQABAAABAQDMEj71VsgCsMiV3yRhAoot2vozfg2tFklv53MchMxjoQEebXCbdevKs92d9R%2B9c7hPG4h8uiTwozfC6IMYLNXQgQsUItmoWZqu16a6iQ5j7vmkkNPNR78moJIr%2F8ZQkg4K2I0382QVSU1JB3Sp2QrsTrwU46PtKiiASTJPTP5ynCpVECTwZKdcf6LfA9GXTpEgJJQkKRFrkGAJxMeZDRI4PBR5UDYGCOivIvGB7DQCLuEQax0T6M%2BFmMISU7UqXZ03947w0muunLhwMVPC76GI0OpYB%2B4hRmXjLv%2FLYDRES3rhB2T2fuq4iCXQ3SzI1o5bG1FPBoWprCBYWvbzHnjb%20jihoon%40mac
-```
-
-**Example response**:
-
-```javascript
-HTTP/1.1 200 OK
-Content-Type: application/json; charset=utf-8
-
-{
-  "public_keys": {
-    "c1:fc:6d:29:ab:b8:03:57:c4:30:a6:b7:58:40:74:af": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCzRcsDraIFmeuZ+q6Ic9epAzXPy8WnkqZwLnauH9YBMPhrVQH6nnr/YSGxhYivnG1Qu0AirSUBAjFL7uD9YLeUhwwdKkhHa+bPPMpycmOopyafZyYAEIuZUwyjnK/2mniNJZ+YZhfBJ1z9Xh1hMIFtls/LP1Q7C25rIDg7l1khZ1cEV0mAzJjb4QBvqAt6TjC/YbUZ4/45rHRuQsu/RBhYpuffFwqlLHfjSO2i6TuJtNsEJ2kDDLooM/THf3J2TxObomusErPTgwAo8ya1GmEB5NuwysZx1posjPZIQwg0Q3RqLzMOPlnZpG2l/lvVfEU+iCcc246z4D4Ej9WnuWFR jihoon@ubuntu",
-    "e1:82:d8:93:44:20:cc:ff:c1:b8:0c:c3:82:bc:17:a9": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDMEj71VsgCsMiV3yRhAoot2vozfg2tFklv53MchMxjoQEebXCbdevKs92d9R+9c7hPG4h8uiTwozfC6IMYLNXQgQsUItmoWZqu16a6iQ5j7vmkkNPNR78moJIr/8ZQkg4K2I0382QVSU1JB3Sp2QrsTrwU46PtKiiASTJPTP5ynCpVECTwZKdcf6LfA9GXTpEgJJQkKRFrkGAJxMeZDRI4PBR5UDYGCOivIvGB7DQCLuEQax0T6M+FmMISU7UqXZ03947w0muunLhwMVPC76GI0OpYB+4hRmXjLv/LYDRES3rhB2T2fuq4iCXQ3SzI1o5bG1FPBoWprCBYWvbzHnjb jihoon@mac"
-  }
-}
-```
-
-**POST Params**:
-
-- **public\_key[]** - ssh pub keys to add
-
-**Status Codes**:
-
-- **200** - no error
-- **422** - missing or invalid params
-- **404** - no such container
-
-### Remove an authorized public key
-
-`DELETE /containers/(id)/public_keys/(key_fingerprint)`
-
-**Example request**:
-
-```
-DELETE /containers/2cf1503ed6a0/public_keys/e1:82:d8:93:44:20:cc:ff:c1:b8:0c:c3:82:bc:17:a9 HTTP/1.1
-```
-
-**Example response**:
-
-```javascript
-HTTP/1.1 200 OK
-Content-Type: application/json; charset=utf-8
-
-{
-  "public_keys": {
-    "c1:fc:6d:29:ab:b8:03:57:c4:30:a6:b7:58:40:74:af": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCzRcsDraIFmeuZ+q6Ic9epAzXPy8WnkqZwLnauH9YBMPhrVQH6nnr/YSGxhYivnG1Qu0AirSUBAjFL7uD9YLeUhwwdKkhHa+bPPMpycmOopyafZyYAEIuZUwyjnK/2mniNJZ+YZhfBJ1z9Xh1hMIFtls/LP1Q7C25rIDg7l1khZ1cEV0mAzJjb4QBvqAt6TjC/YbUZ4/45rHRuQsu/RBhYpuffFwqlLHfjSO2i6TuJtNsEJ2kDDLooM/THf3J2TxObomusErPTgwAo8ya1GmEB5NuwysZx1posjPZIQwg0Q3RqLzMOPlnZpG2l/lvVfEU+iCcc246z4D4Ej9WnuWFR jihoon@ubuntu"
-  }
-}
-```
-
-**Status Codes**:
-
-- **200** - no error
-- **404** - no such container
 
 - - -
 Copyright (c) 2014 Irrational Industries, Inc. d.b.a. Nitrous.IO. All Rights Reserved.

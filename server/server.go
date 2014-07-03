@@ -54,7 +54,4 @@ func (s *Server) drawRoutes() {
 	s.route("/containers/{id}/start", s.startContainer, "POST")
 	s.route("/containers/{id}/stop", s.stopContainer, "POST")
 	s.route("/containers/{id}/restart", s.restartContainer, "POST")
-	s.route("/containers/{id}/public_keys", s.listPublicKeys, "GET")
-	s.route("/containers/{id}/public_keys", s.addPublicKeys, "POST", "PUT")
-	s.route("/containers/{id}/public_keys/{key_fingerprint}", s.removePublicKey, "DELETE")
 }

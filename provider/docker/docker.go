@@ -4,10 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"errors"
-	"io/ioutil"
-	"os"
-	"path"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -65,20 +61,8 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 	return list, nil
 }
 
-func (p *DockerProvider) Create(name string, image string, publicKeys []string) (*provider.ContainerInfo, error) {
+func (p *DockerProvider) Create(name string, image string) (*provider.ContainerInfo, error) {
 	imageName, err := p.buildImage(name, image)
-	if err != nil {
-		return nil, err
-	}
-
-	// validate pubkeys and remove duplicates
-	keymap, err := keysToKeyMap(publicKeys)
-	if err != nil {
-		return nil, err
-	}
-	publicKeys = keyMapToKeys(keymap)
-
-	err = p.createAuthorizedKeys(name, publicKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -98,12 +82,11 @@ func (p *DockerProvider) GetInfo(id string) (*provider.ContainerInfo, error) {
 	}
 
 	return &provider.ContainerInfo{
-		ID:      container.ID,
-		Name:    nameFromContainer(container),
-		Image:   container.Config.Image,
-		Host:    container.NetworkSettings.IPAddress,
-		SSHPort: portFromContainer(container),
-		State:   stateFromContainer(container),
+		ID:    container.ID,
+		Name:  nameFromContainer(container),
+		Image: container.Config.Image,
+		Host:  container.NetworkSettings.IPAddress,
+		State: stateFromContainer(container),
 	}, nil
 }
 
@@ -201,69 +184,10 @@ func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 	p.logger.TimeInfo(start, "DockerProvider: removed container image", containerImage, "in")
 
 	info.Host = ""
-	info.SSHPort = 0
 	info.State = ""
 
 	p.logger.TimeInfo(terminationStart, "DockerProvider: terminated container", id, "in")
 	return info, nil
-}
-
-func (p *DockerProvider) ListPublicKeys(id string) (map[string]string, error) {
-	container, err := p.inspectContainer(id)
-	if err != nil {
-		return nil, err
-	}
-
-	keys, err := p.readAuthorizedKeys(nameFromContainer(container))
-	if err != nil {
-		return nil, err
-	}
-
-	return keysToKeyMap(keys)
-}
-
-func (p *DockerProvider) AddPublicKeys(id string, publicKeys []string) error {
-	container, err := p.inspectContainer(id)
-	if err != nil {
-		return err
-	}
-	name := nameFromContainer(container)
-
-	existingKeys, err := p.readAuthorizedKeys(name)
-	if err != nil {
-		return err
-	}
-
-	// validate pubkeys and remove duplicates
-	keymap, err := keysToKeyMap(append(publicKeys, existingKeys...))
-	if err != nil {
-		return err
-	}
-	publicKeys = keyMapToKeys(keymap)
-
-	return p.createAuthorizedKeys(name, publicKeys)
-}
-
-func (p *DockerProvider) RemovePublicKey(id string, keyFingerprint string) error {
-	container, err := p.inspectContainer(id)
-	if err != nil {
-		return err
-	}
-	name := nameFromContainer(container)
-
-	keys, err := p.readAuthorizedKeys(name)
-	if err != nil {
-		return err
-	}
-
-	keymap, err := keysToKeyMap(keys)
-	if err != nil {
-		return err
-	}
-	delete(keymap, keyFingerprint)
-	keys = keyMapToKeys(keymap)
-
-	return p.createAuthorizedKeys(name, keys)
 }
 
 func (p *DockerProvider) IsNotFoundError(err error) bool {
@@ -286,8 +210,6 @@ func (p *DockerProvider) buildImage(name string, image string) (string, error) {
 	tr := tar.NewWriter(inputbuf)
 	tr.WriteHeader(&tar.Header{Name: "Dockerfile", Mode: 0644, Size: int64(buf.Len()), ModTime: start, AccessTime: start, ChangeTime: start})
 	tr.Write(buf.Bytes())
-	tr.WriteHeader(&tar.Header{Name: "sshd_config", Mode: 0644, Size: int64(len(sshdConfig)), ModTime: start, AccessTime: start, ChangeTime: start})
-	tr.Write(sshdConfig)
 	tr.Close()
 
 	opts := dockerclient.BuildImageOptions{
@@ -304,45 +226,6 @@ func (p *DockerProvider) buildImage(name string, image string) (string, error) {
 
 	p.logger.TimeInfo(start, "DockerProvider: built container image", imageName, "in")
 	return imageName, err
-}
-
-func (p *DockerProvider) containerSettingsDir(containerName string) string {
-	return path.Join(p.dataPath, "containers", containerName)
-}
-
-func (p *DockerProvider) createAuthorizedKeys(containerName string, publicKeys []string) error {
-	p.logger.Info("DockerProvider: creating SSH authorized keys file for container", containerName, "with", len(publicKeys), "entries")
-	dir := path.Join(p.containerSettingsDir(containerName), "ssh")
-	err := os.MkdirAll(dir, 0755)
-	if err != nil {
-		return err
-	}
-	filename := path.Join(dir, "authorized_keys")
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	for _, key := range publicKeys {
-		key = strings.TrimSpace(strings.Replace(key, "\n", "", -1)) + "\n"
-		_, err = file.Write([]byte(key))
-		if err != nil {
-			return err
-		}
-	}
-
-	p.logger.Info("DockerProvider: created SSH authorized keys file for container", containerName)
-	return nil
-}
-
-func (p *DockerProvider) readAuthorizedKeys(containerName string) ([]string, error) {
-	keysFile := path.Join(p.containerSettingsDir(containerName), "ssh", "authorized_keys")
-	bkeys, err := ioutil.ReadFile(keysFile)
-	if err != nil {
-		return nil, err
-	}
-	return strings.Split(strings.TrimSpace(string(bkeys)), "\n"), nil
 }
 
 func (p *DockerProvider) createContainer(imageName string, containerName string) (*dockerclient.Container, error) {
@@ -369,9 +252,6 @@ func (p *DockerProvider) createContainer(imageName string, containerName string)
 	start = time.Now()
 
 	err = p.client.StartContainer(id, &dockerclient.HostConfig{
-		Binds: []string{
-			(p.containerSettingsDir(containerName) + "/ssh:/etc/ssh/freighter:ro"),
-		},
 		PortBindings:    map[dockerclient.Port][]dockerclient.PortBinding{},
 		PublishAllPorts: true,
 	})
@@ -401,33 +281,4 @@ func stateFromContainer(container *dockerclient.Container) string {
 		return provider.ContainerStateRunning
 	}
 	return provider.ContainerStateStopped
-}
-
-func portFromContainer(container *dockerclient.Container) uint16 {
-	port, _ := strconv.Atoi(container.HostConfig.PortBindings["22/tcp"][0].HostPort)
-	return uint16(port)
-}
-
-// converts []pubkey to map[keyFingerprint]pubkey
-func keysToKeyMap(keys []string) (map[string]string, error) {
-	keymap := map[string]string{}
-	for _, key := range keys {
-		fingerprint, err := util.Md5Fingerprint(key)
-		if err != nil {
-			return nil, err
-		}
-		keymap[fingerprint] = key
-	}
-	return keymap, nil
-}
-
-// converts map[keyFingerprint]pubkey back to []pubkey
-func keyMapToKeys(keymap map[string]string) []string {
-	keys := make([]string, len(keymap))
-	i := 0
-	for _, key := range keymap {
-		keys[i] = key
-		i++
-	}
-	return keys
 }
