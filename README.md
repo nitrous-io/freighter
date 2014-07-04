@@ -460,6 +460,41 @@ Content-Type: application/json; charset=utf-8
 - **200** - no error
 - **404** - no such container
 
+### Run a command on the container
+
+`POST /containers/(id)/run`
+
+**Example request**:
+
+```
+ POST /containers/2cf1503ed6a0/run HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+command="whoami"&username=action
+```
+
+**Example response**:
+When success, this establish a HTTP stream that user can write to /read from
+the command just as if the user is interacting with it inside the container
+
+```
+Content-Type: application/octet-stream
+
+{{ STREAM }}
+```
+
+**POST Params**:
+
+- **command** - command that we want to run in the container
+- **username** - (optional) user that we want to run the command. Default to
+  root
+
+**Status Codes**:
+
+- **202** - accepted
+- **404** - no such container
+
+
 ### Create a shell session on the container
 
 `POST /containers/(id)/shells`
