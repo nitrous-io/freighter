@@ -4,8 +4,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"errors"
+	"io"
 	"io/ioutil"
+	"log"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -13,6 +16,7 @@ import (
 	"time"
 
 	dockerclient "github.com/fsouza/go-dockerclient"
+	"github.com/nitrous-io/freighter/pkg/stdcopy"
 	"github.com/nitrous-io/freighter/provider"
 	"github.com/nitrous-io/freighter/util"
 )
@@ -269,6 +273,42 @@ func (p *DockerProvider) RemovePublicKey(id string, keyFingerprint string) error
 func (p *DockerProvider) IsNotFoundError(err error) bool {
 	_, ok := err.(*dockerclient.NoSuchContainer)
 	return ok
+}
+
+// Run a command on the docker container and stream back stdout/stderr. This
+// doesnt handle stdin (yet??)
+func (p *DockerProvider) Run(id string, w io.Writer, cmd string) error {
+	container, err := p.inspectContainer(id)
+	if err != nil {
+		return err
+	}
+	args := []string{
+		"--name", container.ID,
+		"--clear-env",
+		"--",
+		cmd,
+	}
+	c := exec.Command("lxc-attach", args...)
+	stdoutR, err := c.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderrR, err := c.StderrPipe()
+	if err != nil {
+		return err
+	}
+	go func() {
+		_, err := io.Copy(stdcopy.NewStdWriter(w, stdcopy.Stdout), stdoutR)
+		log.Println("stdout", err)
+	}()
+	go func() {
+		_, err := io.Copy(stdcopy.NewStdWriter(w, stdcopy.Stderr), stderrR)
+		log.Println("stderr", err)
+	}()
+	if err := c.Start(); err != nil {
+		return err
+	}
+	return c.Wait()
 }
 
 func (p *DockerProvider) buildImage(name string, image string) (string, error) {
