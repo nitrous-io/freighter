@@ -3,7 +3,6 @@ package server
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -180,7 +179,7 @@ func (s *Server) createShell(w http.ResponseWriter, r *http.Request) error {
 	}
 	shellID := randomString()
 	s.shells[shellID] = shell
-	s.respondEncodeJson(w, http.StatusOK, map[string]interface{}{"id": shellID})
+	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"id": shellID})
 	return nil
 }
 
@@ -229,21 +228,6 @@ func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) error {
 	}
 	s.respond(w, http.StatusAccepted, jsonStatusAccepted)
 	return nil
-}
-
-func (s *Server) runCommand(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
-	cmd := r.FormValue("command")
-	if cmd == "" {
-		s.handleError(w, errors.New("Missing command"))
-		return
-	}
-	// run the command and stream back stdout/stderr to the writer
-	err := s.provider.Run(id, w, cmd)
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
 }
 
 func hijackServer(w http.ResponseWriter) (io.ReadCloser, io.Writer, error) {

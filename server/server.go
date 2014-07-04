@@ -71,7 +71,4 @@ func (s *Server) drawRoutes() {
 	s.route("/containers/{id}/shells", s.wrapError(s.createShell), "POST")
 	s.route("/shells/{id}/attach", s.wrapError(s.attachShell), "POST")
 	s.route("/shells/{id}/resize", s.wrapError(s.resizeShell), "POST")
-
-	// run a command on the container
-	s.route("/containers/{id}/run", s.runCommand, "POST")
 }
