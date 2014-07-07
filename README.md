@@ -572,5 +572,37 @@ width=100&height=80
 - **202** - accepted
 - **404** - no such shell session
 
+### Run a command in the container
+
+This should be used when we want to run the command in a non-interactive
+environment and want to get back a multiplexed stream of stdout/stderr
+
+`POST /containers/(id)/exec`
+
+**Example request**:
+
+```
+POST /containers/2cf1503ed6a0/exec HTTP/1.1
+```
+
+**Query Params**:
+
+- **command** - command to run in the container.
+- **username** - _(optional)_ username to run the command. Default to root
+
+**Example response**:
+
+```javascript
+HTTP/1.1 200 OK
+Content-Type: application/vnd.freighterd.raw-stream
+
+{{ STREAM }}
+```
+
+**Status Codes**:
+
+- **200** - no error
+- **404** - no such container
+
 - - -
 Copyright (c) 2014 Irrational Industries, Inc. d.b.a. Nitrous.IO. All Rights Reserved.
