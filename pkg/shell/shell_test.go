@@ -24,32 +24,31 @@ func (cw *chanWriter) Write(p []byte) (int, error) {
 
 func testShell() *Shell {
 	s := &Shell{
-		id:       "localbox",
-		username: "action",
-		cmd:      exec.Command("bash"),
+		id:  "localbox",
+		cmd: exec.Command("bash"),
 	}
 	return s
 }
 
 func TestNewShell(t *testing.T) {
 	testCases := []struct {
-		id, expectedId             string
-		username, expectedUsername string
-		expectedError              bool
+		id, expectedId           string
+		command, expectedCommand string
+		expectedError            bool
 	}{
-		{id: "", username: "action", expectedError: true},
-		{id: "1234", expectedId: "1234", username: "action", expectedUsername: "action"},
-		{id: "1234", expectedId: "1234", expectedUsername: defaultUsername},
+		{id: "", expectedError: true},
+		{id: "1234", expectedError: true},
+		{id: "1234", expectedId: "1234", command: "whoami", expectedCommand: "whoami"},
 	}
 	for _, tc := range testCases {
-		s, err := NewShell(tc.id, tc.username)
+		s, err := NewShell(tc.id, tc.command)
 		switch {
 		case tc.expectedError && err != nil:
 			continue
 		case tc.expectedError && err == nil:
 			t.Errorf("Expected err but pass %+v", tc)
-		case tc.expectedId != s.id || tc.expectedUsername != s.username:
-			t.Errorf("Incorrect id or username %+v %+v", tc, s)
+		case tc.expectedId != s.id || tc.expectedCommand != s.command:
+			t.Errorf("Incorrect id or command %+v %+v", tc, s)
 		}
 	}
 }

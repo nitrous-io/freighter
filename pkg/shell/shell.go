@@ -13,35 +13,31 @@ import (
 )
 
 const (
-	defaultUsername = "root"
-	defaultTerm     = "xterm-256color"
-	defaultWidth    = 80
-	defaultHeight   = 60
+	defaultTerm   = "xterm-256color"
+	defaultWidth  = 80
+	defaultHeight = 60
 
 	defaultTimeout = 100 * time.Millisecond
 )
 
 var (
-	ErrMissingId   = errors.New("Missing id")
+	ErrMissingArg  = errors.New("Missing arguments: check id and command")
 	ErrInvalidTerm = errors.New("Invalid term")
 )
 
-func NewShell(id, username string) (*Shell, error) {
-	if id == "" {
-		return nil, ErrMissingId
-	}
-	if username == "" {
-		username = defaultUsername
+func NewShell(id, command string) (*Shell, error) {
+	if id == "" || command == "" {
+		return nil, ErrMissingArg
 	}
 	s := &Shell{
-		id:       id,
-		username: username,
+		id:      id,
+		command: command,
 	}
 	return s, nil
 }
 
-func OpenShell(id, username string, width, height int) (*Shell, error) {
-	s, err := NewShell(id, username)
+func OpenShell(id, command string, width, height int) (*Shell, error) {
+	s, err := NewShell(id, command)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +52,7 @@ type Shell struct {
 	username string
 	id       string
 	term     *os.File
+	command  string
 	// we use lxc-attach by default, but user can switch this to a more
 	// lightweight command like bash for testing purpose
 	cmd *exec.Cmd
@@ -81,7 +78,7 @@ func (s *Shell) Open(w, h int) error {
 			"--clear-env",
 			"--set-var", "TERM=" + defaultTerm,
 			"--",
-			"sudo", "login", "-f", s.username,
+			"sh", "-c", s.command,
 		}
 		s.cmd = exec.Command("lxc-attach", args...)
 	}

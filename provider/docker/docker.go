@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"strconv"
@@ -404,6 +405,7 @@ func stateFromContainer(container *dockerclient.Container) string {
 }
 
 func portFromContainer(container *dockerclient.Container) uint16 {
+	log.Println(container, container.HostConfig.PortBindings)
 	port, _ := strconv.Atoi(container.HostConfig.PortBindings["22/tcp"][0].HostPort)
 	return uint16(port)
 }
