@@ -49,10 +49,9 @@ func OpenShell(id, command string, width, height int) (*Shell, error) {
 }
 
 type Shell struct {
-	username string
-	id       string
-	term     *os.File
-	command  string
+	id      string
+	command string
+	term    *os.File
 	// we use lxc-attach by default, but user can switch this to a more
 	// lightweight command like bash for testing purpose
 	cmd *exec.Cmd

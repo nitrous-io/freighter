@@ -507,12 +507,9 @@ POST /containers/2cf1503ed6a0/shells HTTP/1.1
 
 **Query Params**:
 
-- **username** - _(optional)_ username that we want to login to. Default to
-  root
+- **command** - command to run in the shell.
 - **width** - _(optional)_ initial width of the term. Default to 80
 - **height** - _(optional)_ initial height of the term. Default to 60
-- **command** - _(optional)_ command to run in the shell. Default to login as
-  the user
 
 **Example response**:
 

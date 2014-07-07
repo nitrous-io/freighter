@@ -169,11 +169,11 @@ func (s *Server) createShell(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("Cannot attach to stopped container %v", containerID)
 	}
 
+	command := r.FormValue("command")
 	width := getFormInt(r, "width")
 	height := getFormInt(r, "height")
-	loginCmd := shell.GetLoginCommand(r.FormValue("username"))
 
-	shell, err := shell.OpenShell(containerID, loginCmd, width, height)
+	shell, err := shell.OpenShell(containerID, command, width, height)
 	if err != nil {
 		return err
 	}
