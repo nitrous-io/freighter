@@ -46,7 +46,6 @@ var _ = Describe("provider/docker", func() {
 	cleanUpContainer := func(name string) {
 		exec.Command("docker", "stop", name).Run()
 		exec.Command("docker", "rm", name).Run()
-		exec.Command("docker", "rmi", namespace+"."+name).Run()
 	}
 
 	Describe(".Create()", func() {
@@ -64,7 +63,7 @@ var _ = Describe("provider/docker", func() {
 		)
 
 		getID := func(name string) string {
-			id, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", name).CombinedOutput()
+			id, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", fmt.Sprintf("%s.%s", namespace, name)).CombinedOutput()
 			Expect(err).To(BeNil())
 			return strings.TrimSpace(string(id))
 		}
@@ -116,8 +115,8 @@ var _ = Describe("provider/docker", func() {
 
 		It("creates a container successfully", func() {
 			Expect(info.ID).To(Equal(id))
-			Expect(info.Name).To(Equal(name))
-			Expect(info.Image).To(Equal(namespace + "." + name))
+			Expect(info.Name).To(Equal(namespace + "." + name))
+			Expect(info.Image).To(Equal(image))
 			Expect(info.Host).To(Equal(host))
 			Expect(info.SSHPort).To(Equal(port))
 			Expect(info.State).To(Equal(provider.ContainerStateRunning))
@@ -189,8 +188,8 @@ var _ = Describe("provider/docker", func() {
 							info, err := prov.GetInfo(id)
 							Expect(err).To(BeNil())
 							Expect(info.ID).To(Equal(id))
-							Expect(info.Name).To(Equal(name))
-							Expect(info.Image).To(Equal(namespace + "." + name))
+							Expect(info.Name).To(Equal(namespace + "." + name))
+							Expect(info.Image).To(Equal(image))
 							Expect(info.Host).To(Equal(""))
 							Expect(info.SSHPort).To(Equal(port))
 							Expect(info.State).To(Equal(provider.ContainerStateStopped))
@@ -198,8 +197,8 @@ var _ = Describe("provider/docker", func() {
 							info, err = prov.GetInfo(container2Info.ID)
 							Expect(err).To(BeNil())
 							Expect(info.ID).To(Equal(container2Info.ID))
-							Expect(info.Name).To(Equal(container2Name))
-							Expect(info.Image).To(Equal(namespace + "." + container2Name))
+							Expect(info.Name).To(Equal(namespace + "." + container2Name))
+							Expect(info.Image).To(Equal(image))
 							Expect(info.Host).To(Equal(container2Info.Host))
 							Expect(info.SSHPort).To(Equal(container2Info.SSHPort))
 							Expect(info.State).To(Equal(provider.ContainerStateRunning))
@@ -229,8 +228,8 @@ var _ = Describe("provider/docker", func() {
 				expectContainerInfoToHaveBeenReturned := func() {
 					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
-					Expect(info.Name).To(Equal(name))
-					Expect(info.Image).To(Equal(namespace + "." + name))
+					Expect(info.Name).To(Equal(namespace + "." + name))
+					Expect(info.Image).To(Equal(image))
 					Expect(info.Host).To(Equal(host))
 					Expect(info.SSHPort).To(Equal(port))
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
@@ -275,10 +274,10 @@ var _ = Describe("provider/docker", func() {
 				expectContainerInfoToHaveBeenReturned := func() {
 					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
-					Expect(info.Name).To(Equal(name))
-					Expect(info.Image).To(Equal(namespace + "." + name))
 					Expect(info.Host).To(Equal(""))
 					Expect(info.SSHPort).To(Equal(port))
+					Expect(info.Name).To(Equal(namespace + "." + name))
+					Expect(info.Image).To(Equal(image))
 					Expect(info.State).To(Equal(provider.ContainerStateStopped))
 				}
 
@@ -312,8 +311,8 @@ var _ = Describe("provider/docker", func() {
 				expectContainerInfoToHaveBeenReturned := func(info *provider.ContainerInfo) {
 					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
-					Expect(info.Name).To(Equal(name))
-					Expect(info.Image).To(Equal(namespace + "." + name))
+					Expect(info.Name).To(Equal(namespace + "." + name))
+					Expect(info.Image).To(Equal(image))
 					Expect(info.Host).To(Equal(host))
 					Expect(info.SSHPort).To(Equal(port))
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
@@ -371,8 +370,8 @@ var _ = Describe("provider/docker", func() {
 				expectContainerInfoToHaveBeenReturned := func() {
 					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
-					Expect(info.Name).To(Equal(name))
-					Expect(info.Image).To(Equal(namespace + "." + name))
+					Expect(info.Name).To(Equal(namespace + "." + name))
+					Expect(info.Image).To(Equal(image))
 					Expect(info.Host).To(Equal(""))
 					Expect(info.SSHPort).To(Equal(uint16(0)))
 					Expect(info.State).To(Equal(""))

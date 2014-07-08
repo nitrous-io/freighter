@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -36,7 +37,11 @@ func NewDockerProvider(logger *util.Logger, dataPath string, imageNamespace stri
 	if logger == nil || dataPath == "" || imageNamespace == "" {
 		return nil, errors.New("docker.NewDockerProvider: invalid argument")
 	}
-	client, err := dockerclient.NewClient("unix:///var/run/docker.sock")
+	host := os.Getenv("DOCKER_HOST")
+	if host == "" {
+		host = "unix:///var/run/docker.sock"
+	}
+	client, err := dockerclient.NewClient(host)
 	if err != nil {
 		return nil, err
 	}
@@ -54,37 +59,24 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 	list := []*provider.ContainerInfo{}
 
 	for _, apicontainer := range apicontainers {
-		if strings.HasPrefix(apicontainer.Image, p.imageNamespace) {
-			info, err := p.GetInfo(apicontainer.ID)
-			if err != nil {
-				return nil, err
+		for _, name := range apicontainer.Names {
+			if strings.HasPrefix(name, "/" + p.imageNamespace) {
+				info, err := p.GetInfo(apicontainer.ID)
+				if err != nil {
+					return nil, err
+				}
+				list = append(list, info)
+				break
 			}
-			list = append(list, info)
 		}
 	}
 
 	return list, nil
 }
 
-func (p *DockerProvider) Create(name string, image string, publicKeys []string) (*provider.ContainerInfo, error) {
-	imageName, err := p.buildImage(name, image)
-	if err != nil {
-		return nil, err
-	}
-
-	// validate pubkeys and remove duplicates
-	keymap, err := keysToKeyMap(publicKeys)
-	if err != nil {
-		return nil, err
-	}
-	publicKeys = keyMapToKeys(keymap)
-
-	err = p.createAuthorizedKeys(name, publicKeys)
-	if err != nil {
-		return nil, err
-	}
-
+func (p *DockerProvider) Create(name string, imageName string) (*provider.ContainerInfo, error) {
 	container, err := p.createContainer(imageName, name)
+
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +171,9 @@ func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	info, err = p.GetInfo(id)
+	fmt.Printf("info: %v\n", info)
 
 	p.logger.Info("DockerProvider: removing container", id)
 	start := time.Now()
@@ -287,40 +282,15 @@ func (p *DockerProvider) Export(id string, output io.Writer) error {
 	return p.client.ExportContainer(opts)
 }
 
-func (p *DockerProvider) buildImage(name string, image string) (string, error) {
-	imageName := p.imageNamespace + name
-	p.logger.Info("DockerProvider: building container image", imageName, "with base image", image)
+func (p *DockerProvider) createContainer(imageName string, containerName string) (*dockerclient.Container, error) {
+	p.logger.Info("DockerProvider: creating container", containerName, "with image", imageName)
 	start := time.Now()
 
-	buf := &bytes.Buffer{}
-	err := dockerfileUbuntu.Execute(buf, &TemplateData{Name: name, Image: image})
-	if err != nil {
-		return "", err
-	}
-
-	inputbuf, outputbuf := &bytes.Buffer{}, &bytes.Buffer{}
-	tr := tar.NewWriter(inputbuf)
-	tr.WriteHeader(&tar.Header{Name: "Dockerfile", Mode: 0644, Size: int64(buf.Len()), ModTime: start, AccessTime: start, ChangeTime: start})
-	tr.Write(buf.Bytes())
-	tr.WriteHeader(&tar.Header{Name: "sshd_config", Mode: 0644, Size: int64(len(sshdConfig)), ModTime: start, AccessTime: start, ChangeTime: start})
-	tr.Write(sshdConfig)
-	tr.Close()
-
-	opts := dockerclient.BuildImageOptions{
-		Name:           imageName,
-		InputStream:    inputbuf,
-		OutputStream:   outputbuf,
-		RmTmpContainer: true,
-	}
-
-	err = p.client.BuildImage(opts)
-	if err != nil {
-		return "", err
-	}
-
-	p.logger.TimeInfo(start, "DockerProvider: built container image", imageName, "in")
-	return imageName, err
-}
+	err := p.client.PullImage(dockerclient.PullImageOptions{
+		Repository: "ubuntu-upstart",
+		Tag: "trusty",
+	}, dockerclient.AuthConfiguration{
+	})
 
 func (p *DockerProvider) containerSettingsDir(containerName string) string {
 	return path.Join(p.dataPath, "containers", containerName)
@@ -366,7 +336,7 @@ func (p *DockerProvider) createContainer(imageName string, containerName string)
 	start := time.Now()
 
 	container, err := p.client.CreateContainer(dockerclient.CreateContainerOptions{
-		Name: containerName,
+		Name: p.imageNamespace + containerName,
 		Config: &dockerclient.Config{
 			Hostname: containerName,
 			Image:    imageName,
@@ -402,7 +372,7 @@ func (p *DockerProvider) inspectContainer(id string) (*dockerclient.Container, e
 	if err != nil {
 		return nil, err
 	}
-	if !strings.HasPrefix(container.Config.Image, p.imageNamespace) {
+	if !strings.HasPrefix(container.Name, "/" + p.imageNamespace) {
 		return nil, &dockerclient.NoSuchContainer{ID: id}
 	}
 	return container, nil
