@@ -26,12 +26,9 @@ release:
 format:
 	goop go fmt ./...
 
-dockerclean:
-	@script/docker-clean
-
 test:
 	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
-	@script/test
+	@script/docker-wrap script/test
 
 citest:
 	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
