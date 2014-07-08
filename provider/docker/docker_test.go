@@ -1,10 +1,9 @@
 package docker_test
 
 import (
-	"io/ioutil"
+	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +28,7 @@ var _ = Describe("provider/docker", func() {
 		dbFile    string
 		prov      *docker.DockerProvider
 		namespace = "freightertest"
+		image     = "ubuntu-upstart:trusty"
 	)
 
 	BeforeEach(func() {
@@ -53,7 +53,6 @@ var _ = Describe("provider/docker", func() {
 			name         string
 			id           string
 			host         string
-			port         uint16
 			info         *provider.ContainerInfo
 			pubkey1      = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQCxCeR/jJna6xXELDV8HF51QQPbj++JNDE4W/nqLyhzRTEDDnAfyp8gXW/EXXos8w5XXLak6eUDXE/QI6o8blX39RYoT47u45v4b2scN0ZiS5McmESo193KwWH3gXHbnHWywzPy7+GrRF3nHm/uidvp0tqh4ywqIZujaMjST1sIOQ== test@example.com"
 			pubkey2      string
@@ -74,31 +73,14 @@ var _ = Describe("provider/docker", func() {
 			return strings.TrimSpace(string(host))
 		}
 
-		getPort := func(id string) uint16 {
-			port, err := exec.Command("bash", "-c", `docker inspect -f {{.NetworkSettings.Ports}} `+id+` | sed 's/.*HostPort:\([0-9]*\).*/\1/'`).CombinedOutput()
-			Expect(err).To(BeNil())
-			n, err := strconv.Atoi(strings.TrimSpace(string(port)))
-			Expect(err).To(BeNil())
-			return uint16(n)
-		}
-
 		BeforeEach(func() {
 			var err error
 			name = RandomName("freightertest")
 
-			userPubkey := TestSSHPubKey
-			pubkey2 = strings.TrimSpace(string(userPubkey))
-			fingerprint2, err = util.Md5Fingerprint(pubkey2)
-			Expect(err).To(BeNil())
-
-			sshkeypath = TempFile("")
-			ioutil.WriteFile(sshkeypath, []byte(TestSSHPrivKey), 0600)
-
-			info, err = prov.Create(name, "ubuntu-upstart:trusty", []string{pubkey1, pubkey2})
+			info, err = prov.Create(name, image)
 			Expect(err).To(BeNil())
 			id = getID(name)
 			host = getHost(id)
-			port = getPort(id)
 		})
 
 		AfterEach(func() {
@@ -106,21 +88,20 @@ var _ = Describe("provider/docker", func() {
 			os.Remove(sshkeypath)
 		})
 
-		expectSSHToWork := func() {
-			time.Sleep(1 * time.Second)
-			out, err := exec.Command("ssh", "action@localhost", "-i", sshkeypath, "-p", strconv.Itoa(int(port)), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
-			Expect(out).To(ContainSubstring("success"))
-			Expect(err).To(BeNil())
-		}
+		/* expectSSHToWork := func() {*/
+		/*   time.Sleep(1 * time.Second)*/
+		/*   out, err := exec.Command("ssh", "action@localhost", "-i", sshkeypath, "-p", strconv.Itoa(int(port)), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()*/
+		/*   Expect(out).To(ContainSubstring("success"))*/
+		/*   Expect(err).To(BeNil())*/
+		/* }*/
 
 		It("creates a container successfully", func() {
 			Expect(info.ID).To(Equal(id))
 			Expect(info.Name).To(Equal(namespace + "." + name))
 			Expect(info.Image).To(Equal(image))
 			Expect(info.Host).To(Equal(host))
-			Expect(info.SSHPort).To(Equal(port))
 			Expect(info.State).To(Equal(provider.ContainerStateRunning))
-			expectSSHToWork()
+			/* expectSSHToWork()*/
 		})
 
 		Context("after container is created", func() {
@@ -135,18 +116,18 @@ var _ = Describe("provider/docker", func() {
 
 				BeforeEach(func() {
 					container2Name = RandomName("freightertest2")
-					foreignContainerName = RandomName("freightertest-foreign")
+					foreignContainerName = "notfreighter." + RandomName("freightertest-foreign")
 
 					// shut down first container
 					err := exec.Command("docker", "stop", id).Run()
 					Expect(err).To(BeNil())
 
 					// create another container
-					container2Info, err = prov.Create(container2Name, "ubuntu-upstart:trusty", []string{})
+					container2Info, err = prov.Create(container2Name, image)
 					Expect(err).To(BeNil())
 
 					// create a container not managed by freighter
-					out, err := exec.Command("docker", "run", "-d", "-i", "-t", "--name", foreignContainerName, "ubuntu-upstart:trusty", "/bin/bash").CombinedOutput()
+					out, err := exec.Command("docker", "run", "-d", "-i", "-t", "--name", foreignContainerName, image, "/bin/bash").CombinedOutput()
 					Expect(err).To(BeNil())
 					foreignContainerID = strings.TrimSpace(string(out))
 				})
@@ -167,7 +148,7 @@ var _ = Describe("provider/docker", func() {
 							Name:    name,
 							Image:   namespace + "." + name,
 							Host:    "",
-							SSHPort: port,
+							/* SSHPort: port,*/
 							State:   provider.ContainerStateStopped,
 						}))
 
@@ -176,7 +157,7 @@ var _ = Describe("provider/docker", func() {
 							Name:    container2Name,
 							Host:    container2Info.Host,
 							Image:   namespace + "." + container2Name,
-							SSHPort: container2Info.SSHPort,
+							/* SSHPort: container2Info.SSHPort,*/
 							State:   provider.ContainerStateRunning,
 						}))
 					})
@@ -191,7 +172,7 @@ var _ = Describe("provider/docker", func() {
 							Expect(info.Name).To(Equal(namespace + "." + name))
 							Expect(info.Image).To(Equal(image))
 							Expect(info.Host).To(Equal(""))
-							Expect(info.SSHPort).To(Equal(port))
+							/* Expect(info.SSHPort).To(Equal(port))*/
 							Expect(info.State).To(Equal(provider.ContainerStateStopped))
 
 							info, err = prov.GetInfo(container2Info.ID)
@@ -200,7 +181,7 @@ var _ = Describe("provider/docker", func() {
 							Expect(info.Name).To(Equal(namespace + "." + container2Name))
 							Expect(info.Image).To(Equal(image))
 							Expect(info.Host).To(Equal(container2Info.Host))
-							Expect(info.SSHPort).To(Equal(container2Info.SSHPort))
+							/* Expect(info.SSHPort).To(Equal(container2Info.SSHPort))*/
 							Expect(info.State).To(Equal(provider.ContainerStateRunning))
 						})
 					})
@@ -222,7 +203,7 @@ var _ = Describe("provider/docker", func() {
 					out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 					Expect(err).To(BeNil())
 					Expect(out).To(ContainSubstring("true"))
-					expectSSHToWork()
+					/* expectSSHToWork()*/
 				}
 
 				expectContainerInfoToHaveBeenReturned := func() {
@@ -231,7 +212,7 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Name).To(Equal(namespace + "." + name))
 					Expect(info.Image).To(Equal(image))
 					Expect(info.Host).To(Equal(host))
-					Expect(info.SSHPort).To(Equal(port))
+					/* Expect(info.SSHPort).To(Equal(port))*/
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
 				}
 
@@ -275,7 +256,7 @@ var _ = Describe("provider/docker", func() {
 					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
 					Expect(info.Host).To(Equal(""))
-					Expect(info.SSHPort).To(Equal(port))
+					/* Expect(info.SSHPort).To(Equal(port))*/
 					Expect(info.Name).To(Equal(namespace + "." + name))
 					Expect(info.Image).To(Equal(image))
 					Expect(info.State).To(Equal(provider.ContainerStateStopped))
@@ -314,7 +295,7 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Name).To(Equal(namespace + "." + name))
 					Expect(info.Image).To(Equal(image))
 					Expect(info.Host).To(Equal(host))
-					Expect(info.SSHPort).To(Equal(port))
+					/* Expect(info.SSHPort).To(Equal(port))*/
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
 				}
 
@@ -335,7 +316,7 @@ var _ = Describe("provider/docker", func() {
 						Expect(err).To(BeNil())
 						newStartTime, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(out)))
 						Expect(prevStartTime.Before(newStartTime)).To(BeTrue())
-						expectSSHToWork()
+						/* expectSSHToWork()*/
 					})
 				})
 
@@ -353,7 +334,7 @@ var _ = Describe("provider/docker", func() {
 						out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 						Expect(err).To(BeNil())
 						Expect(out).To(ContainSubstring("true"))
-						expectSSHToWork()
+						/* expectSSHToWork()*/
 					})
 				})
 			})
@@ -373,7 +354,7 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Name).To(Equal(namespace + "." + name))
 					Expect(info.Image).To(Equal(image))
 					Expect(info.Host).To(Equal(""))
-					Expect(info.SSHPort).To(Equal(uint16(0)))
+					/* Expect(info.SSHPort).To(Equal(uint16(0)))*/
 					Expect(info.State).To(Equal(""))
 				}
 

@@ -3,10 +3,11 @@
 tmp=$(mktemp -t docker_XXXXX)
 rm -rf $tmp
 mkdir -p $tmp
+echo "starting docker in $tmp"
 
 OLD_DOCKER_HOST=${DOCKER_HOST}
 export DOCKER_HOST=unix://${tmp}/docker.sock 
-sudo docker -d -g ${tmp}/lib -p ${tmp}/docker.pid -H ${DOCKER_HOST} -e lxc &
+sudo docker -d -g ${tmp}/lib -p ${tmp}/docker.pid -H ${DOCKER_HOST} -e lxc >$tmp/docker.log 2>&1 &
 sleep 1
 
 $*

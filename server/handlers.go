@@ -24,11 +24,6 @@ func (s *Server) listContainers(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createContainer(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	image := r.FormValue("image")
-	publicKeys := r.PostForm["public_key[]"]
-
-	if publicKeys == nil {
-		publicKeys = []string{}
-	}
 
 	if name == "" || !provider.IsValidName(name) {
 		s.respond(w, 422, []byte(`{"error":"name is not valid"}`))
@@ -50,7 +45,7 @@ func (s *Server) createContainer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	info, err := s.provider.Create(name, image, publicKeys)
+	info, err := s.provider.Create(name, image)
 
 	if err != nil {
 		s.logger.Error(err)

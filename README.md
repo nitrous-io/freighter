@@ -73,7 +73,7 @@ Content-Type: application/json; charset=utf-8
 POST /containers HTTP/1.1
 Content-Type: application/x-www-form-urlencoded
 
-name=foo&image=ubuntu-upstart:trusty&callback_url=http://example.com/cb&public_key[]=ssh-rsa%20AAAAB3NzaC1yc2EAAAADAQABAAABAQCzRcsDraIFmeuZ%2Bq6Ic9epAzXPy8WnkqZwLnauH9YBMPhrVQH6nnr%2FYSGxhYivnG1Qu0AirSUBAjFL7uD9YLeUhwwdKkhHa%2BbPPMpycmOopyafZyYAEIuZUwyjnK%2F2mniNJZ%2BYZhfBJ1z9Xh1hMIFtls%2FLP1Q7C25rIDg7l1khZ1cEV0mAzJjb4QBvqAt6TjC%2FYbUZ4%2F45rHRuQsu%2FRBhYpuffFwqlLHfjSO2i6TuJtNsEJ2kDDLooM%2FTHf3J2TxObomusErPTgwAo8ya1GmEB5NuwysZx1posjPZIQwg0Q3RqLzMOPlnZpG2l%2FlvVfEU%2BiCcc246z4D4Ej9WnuWFR%20jihoon%40ubuntu&state=xyz
+nameufoo&image=ubuntu-upstart:trusty
 ```
 
 **Example response**:
@@ -89,7 +89,6 @@ Content-Type: application/json; charset=utf-8
 
 - **name** - container name (a-z, 0-9, and hyphen(-), can't start with hyphen or digits, can't end with hyphen.)
 - **image** - base image to use
-- **public\_key[]** - _(optional)_ ssh pub keys to add
 
 **Status Codes**:
 
