@@ -57,7 +57,7 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 
 	for _, apicontainer := range apicontainers {
 		for _, name := range apicontainer.Names {
-			if strings.HasPrefix(name, "/" + p.imageNamespace) {
+			if strings.HasPrefix(name, "/"+p.imageNamespace) {
 				info, err := p.GetInfo(apicontainer.ID)
 				if err != nil {
 					return nil, err
@@ -72,7 +72,7 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 }
 
 func (p *DockerProvider) Create(name string, imageName string) (*provider.ContainerInfo, error) {
-	err := p.createAuthorizedKeys(p.imageNamespace + name, []string{})
+	err := p.createAuthorizedKeys(p.imageNamespace+name, []string{})
 
 	if err != nil {
 		return nil, err
@@ -94,12 +94,12 @@ func (p *DockerProvider) GetInfo(id string) (*provider.ContainerInfo, error) {
 	}
 
 	return &provider.ContainerInfo{
-		ID:      container.ID,
-		Name:    nameFromContainer(container),
-		Image:   container.Config.Image,
-		Host:    container.NetworkSettings.IPAddress,
-		Ports:   portsFromContainer(container),
-		State:   stateFromContainer(container),
+		ID:    container.ID,
+		Name:  nameFromContainer(container),
+		Image: container.Config.Image,
+		Host:  container.NetworkSettings.IPAddress,
+		Ports: portsFromContainer(container),
+		State: stateFromContainer(container),
 	}, nil
 }
 
@@ -283,9 +283,8 @@ func (p *DockerProvider) createContainer(imageName string, containerName string)
 
 	err := p.client.PullImage(dockerclient.PullImageOptions{
 		Repository: repository,
-		Tag: tag,
-	}, dockerclient.AuthConfiguration{
-	})
+		Tag:        tag,
+	}, dockerclient.AuthConfiguration{})
 
 	if err != nil {
 		return nil, err
@@ -374,7 +373,7 @@ func (p *DockerProvider) inspectContainer(id string) (*dockerclient.Container, e
 	if err != nil {
 		return nil, err
 	}
-	if !strings.HasPrefix(container.Name, "/" + p.imageNamespace) {
+	if !strings.HasPrefix(container.Name, "/"+p.imageNamespace) {
 		return nil, &dockerclient.NoSuchContainer{ID: id}
 	}
 	return container, nil
