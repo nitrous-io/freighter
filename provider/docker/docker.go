@@ -417,13 +417,12 @@ func stateFromContainer(container *dockerclient.Container) string {
 	return provider.ContainerStateStopped
 }
 
-func portsFromContainer(container *dockerclient.Container) (ports map[int]int) {
-	ports = make(map[int]int)
+func portsFromContainer(container *dockerclient.Container) (ports map[string]int) {
+	ports = make(map[string]int)
 	for port, bindings := range container.HostConfig.PortBindings {
 		containerPort, _ := strconv.Atoi(port.Port())
 		for _, binding := range bindings {
-			hostPort, _ := strconv.Atoi(binding.HostPort)
-			ports[hostPort] = containerPort
+			ports[string(binding.HostPort)] = containerPort
 		}
 	}
 	return
