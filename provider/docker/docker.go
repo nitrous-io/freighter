@@ -72,7 +72,7 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 }
 
 func (p *DockerProvider) Create(name string, imageName string) (*provider.ContainerInfo, error) {
-	err := p.createAuthorizedKeys(name, []string{})
+	err := p.createAuthorizedKeys(p.imageNamespace + name, []string{})
 
 	if err != nil {
 		return nil, err
