@@ -242,7 +242,6 @@ var _ = Describe("provider/docker", func() {
 					out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 					Expect(err).To(BeNil())
 					Expect(out).To(ContainSubstring("true"))
-					/* expectSSHToWork()*/
 				}
 
 				expectContainerInfoToHaveBeenReturned := func() {
@@ -355,7 +354,6 @@ var _ = Describe("provider/docker", func() {
 						Expect(err).To(BeNil())
 						newStartTime, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(out)))
 						Expect(prevStartTime.Before(newStartTime)).To(BeTrue())
-						/* expectSSHToWork()*/
 					})
 				})
 
@@ -373,7 +371,6 @@ var _ = Describe("provider/docker", func() {
 						out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 						Expect(err).To(BeNil())
 						Expect(out).To(ContainSubstring("true"))
-						/* expectSSHToWork()*/
 					})
 				})
 			})
