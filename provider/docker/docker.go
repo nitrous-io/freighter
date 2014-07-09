@@ -375,7 +375,13 @@ func (p *DockerProvider) readAuthorizedKeys(containerName string) ([]string, err
 	if err != nil {
 		return nil, err
 	}
-	return strings.Split(strings.TrimSpace(string(bkeys)), "\n"), nil
+	keys := []string{}
+	for _, key := range strings.Split(strings.TrimSpace(string(bkeys)), "\n") {
+		if key != "" {
+			keys = append(keys, key)
+		}
+	}
+	return keys, nil
 }
 
 func (p *DockerProvider) inspectContainer(id string) (*dockerclient.Container, error) {
