@@ -92,7 +92,7 @@ Content-Type: application/json; charset=utf-8
 
 **Status Codes**:
 
-- **200** - accepted
+- **200** - ok
 - **422** - missing or invalid params
 
 ### Get container info
@@ -219,7 +219,6 @@ Content-Type: application/x-www-form-urlencoded
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
-{ "status": "accepted" }
 {
   "result": "restarted",
   "container": {
