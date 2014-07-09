@@ -146,9 +146,11 @@ func (p *DockerProvider) Stop(id string) (*provider.ContainerInfo, error) {
 				info, err := p.GetInfo(id)
 				if err != nil {
 					ech <- err
+					return
 				}
 				if info.State == "stopped" && info.Host == "" {
 					ch <- info
+					return
 				}
 				time.Sleep(time.Second * 1)
 			}
