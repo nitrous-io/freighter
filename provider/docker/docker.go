@@ -24,14 +24,14 @@ type TemplateData struct {
 }
 
 type DockerProvider struct {
-	client         *dockerclient.Client
-	dataPath       string
-	imageNamespace string
-	logger         *util.Logger
+	client             *dockerclient.Client
+	dataPath           string
+	containerNamespace string
+	logger             *util.Logger
 }
 
-func NewDockerProvider(logger *util.Logger, dataPath string, imageNamespace string) (*DockerProvider, error) {
-	if logger == nil || dataPath == "" || imageNamespace == "" {
+func NewDockerProvider(logger *util.Logger, dataPath string, containerNamespace string) (*DockerProvider, error) {
+	if logger == nil || dataPath == "" || containerNamespace == "" {
 		return nil, errors.New("docker.NewDockerProvider: invalid argument")
 	}
 	host := os.Getenv("DOCKER_HOST")
@@ -42,7 +42,7 @@ func NewDockerProvider(logger *util.Logger, dataPath string, imageNamespace stri
 	if err != nil {
 		return nil, err
 	}
-	return &DockerProvider{client: client, dataPath: dataPath, imageNamespace: imageNamespace + ".", logger: logger}, nil
+	return &DockerProvider{client: client, dataPath: dataPath, containerNamespace: containerNamespace + ".", logger: logger}, nil
 }
 
 func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
@@ -57,7 +57,7 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 
 	for _, apicontainer := range apicontainers {
 		for _, name := range apicontainer.Names {
-			if strings.HasPrefix(name, "/"+p.imageNamespace) {
+			if strings.HasPrefix(name, "/"+p.containerNamespace) {
 				info, err := p.GetInfo(apicontainer.ID)
 				if err != nil {
 					return nil, err
@@ -72,7 +72,7 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 }
 
 func (p *DockerProvider) Create(name string, imageName string) (*provider.ContainerInfo, error) {
-	err := p.createAuthorizedKeys(p.imageNamespace+name, []string{})
+	err := p.createAuthorizedKeys(p.containerNamespace+name, []string{})
 
 	if err != nil {
 		return nil, err
@@ -319,7 +319,7 @@ func (p *DockerProvider) createContainer(imageName string, containerName string)
 	}
 
 	container, err := p.client.CreateContainer(dockerclient.CreateContainerOptions{
-		Name: p.imageNamespace + containerName,
+		Name: p.containerNamespace + containerName,
 		Config: &dockerclient.Config{
 			Hostname: containerName,
 			Image:    imageName,
@@ -401,7 +401,7 @@ func (p *DockerProvider) inspectContainer(id string) (*dockerclient.Container, e
 	if err != nil {
 		return nil, err
 	}
-	if !strings.HasPrefix(container.Name, "/"+p.imageNamespace) {
+	if !strings.HasPrefix(container.Name, "/"+p.containerNamespace) {
 		return nil, &dockerclient.NoSuchContainer{ID: id}
 	}
 	return container, nil
