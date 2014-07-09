@@ -28,7 +28,7 @@ format:
 
 test:
 	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
-	@script/test $(TEST)
+	@script/embed-docker script/test $(TEST)
 
 citest:
 	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
