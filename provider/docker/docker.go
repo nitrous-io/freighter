@@ -211,6 +211,7 @@ func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 
 	info.Host = ""
 	info.State = ""
+	info.Ports = map[string]int{}
 
 	p.logger.TimeInfo(terminationStart, "DockerProvider: terminated container", id, "in")
 	return info, nil
