@@ -84,7 +84,7 @@ var _ = Describe("provider/docker", func() {
 		})
 
 		AfterEach(func() {
-			cleanUpContainer(name)
+			cleanUpContainer(namespace + "." + name)
 			os.Remove(sshkeypath)
 		})
 
@@ -133,33 +133,55 @@ var _ = Describe("provider/docker", func() {
 				})
 
 				AfterEach(func() {
-					cleanUpContainer(container2Name)
+					cleanUpContainer(namespace + "." + container2Name)
 					cleanUpContainer(foreignContainerName)
 				})
 
 				Describe(".List()", func() {
+					getAttributes := func(attr string, list []*provider.ContainerInfo) []string {
+						attributes := []string{}
+						for _, info := range list {
+							switch attr {
+							case "Name":
+								attributes = append(attributes, info.Name)
+							case "Host":
+								attributes = append(attributes, info.Host)
+							case "Image":
+								attributes = append(attributes, info.Image)
+							case "State":
+								attributes = append(attributes, info.State)
+							case "ID":
+								attributes = append(attributes, info.ID)
+							}
+						}
+
+						return attributes
+					}
+
 					It("returns a list of all containers managed by freighter, running or stopped", func() {
 						list, err := prov.List()
 						Expect(err).To(BeNil())
 
 						Expect(list).To(HaveLen(2))
-						Expect(list).To(ContainElement(&provider.ContainerInfo{
-							ID:      id,
-							Name:    name,
-							Image:   namespace + "." + name,
-							Host:    "",
-							/* SSHPort: port,*/
-							State:   provider.ContainerStateStopped,
-						}))
 
-						Expect(list).To(ContainElement(&provider.ContainerInfo{
-							ID:      container2Info.ID,
-							Name:    container2Name,
-							Host:    container2Info.Host,
-							Image:   namespace + "." + container2Name,
-							/* SSHPort: container2Info.SSHPort,*/
-							State:   provider.ContainerStateRunning,
-						}))
+						names := getAttributes("Name", list)
+						Expect(names).To(ContainElement(namespace + "." + name))
+						Expect(names).To(ContainElement(namespace + "." + container2Name))
+
+						images := getAttributes("Image", list)
+						Expect(images).To(ContainElement(image))
+
+						hosts := getAttributes("Host", list)
+						Expect(hosts).To(ContainElement(""))
+						Expect(hosts).To(ContainElement(container2Info.Host))
+
+						states := getAttributes("State", list)
+						Expect(states).To(ContainElement(provider.ContainerStateStopped))
+						Expect(states).To(ContainElement(provider.ContainerStateRunning))
+
+						ids := getAttributes("ID", list)
+						Expect(ids).To(ContainElement(id))
+						Expect(ids).To(ContainElement(container2Info.ID))
 					})
 				})
 
