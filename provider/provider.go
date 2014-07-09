@@ -26,12 +26,12 @@ type Provider interface {
 }
 
 type ContainerInfo struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Image   string `json:"image"`
-	Host    string `json:"host"`
-	State   string `json:"state"`
-	Ports		map[int]int `json:"ports"`
+	ID    string      `json:"id"`
+	Name  string      `json:"name"`
+	Image string      `json:"image"`
+	Host  string      `json:"host"`
+	State string      `json:"state"`
+	Ports map[int]int `json:"ports"`
 }
 
 const (
