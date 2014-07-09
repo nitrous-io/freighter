@@ -28,7 +28,7 @@ var _ = Describe("provider/docker", func() {
 		dbFile    string
 		prov      *docker.DockerProvider
 		namespace = "freightertest"
-		image     = "ubuntu-upstart:trusty"
+		image     = "ddollar/busybox-fakessh"
 	)
 
 	BeforeEach(func() {
