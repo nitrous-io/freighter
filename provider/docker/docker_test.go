@@ -127,7 +127,7 @@ var _ = Describe("provider/docker", func() {
 					Expect(err).To(BeNil())
 
 					// create a container not managed by freighter
-					out, err := exec.Command("docker", "run", "-d", "-i", "-t", "--name", foreignContainerName, image, "/bin/bash").CombinedOutput()
+					out, err := exec.Command("docker", "run", "-d", "-i", "-t", "--name", foreignContainerName, image, "/bin/sh").CombinedOutput()
 					Expect(err).To(BeNil())
 					foreignContainerID = strings.TrimSpace(string(out))
 				})
