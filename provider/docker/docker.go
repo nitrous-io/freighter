@@ -162,11 +162,6 @@ func (p *DockerProvider) Restart(id string) (*provider.ContainerInfo, error) {
 }
 
 func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
-	container, err := p.inspectContainer(id)
-	if err != nil {
-		return nil, err
-	}
-
 	p.logger.Info("DockerProvider: terminating container", id)
 	terminationStart := time.Now()
 
@@ -186,17 +181,6 @@ func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 	}
 
 	p.logger.TimeInfo(start, "DockerProvider: removed container", id, "in")
-
-	containerImage := container.Config.Image
-	p.logger.Info("DockerProvider: removing container image", containerImage)
-	start = time.Now()
-
-	err = p.client.RemoveImage(containerImage)
-	if err != nil {
-		return nil, err
-	}
-
-	p.logger.TimeInfo(start, "DockerProvider: removed container image", containerImage, "in")
 
 	info.Host = ""
 	info.State = ""
