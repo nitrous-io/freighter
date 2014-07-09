@@ -138,8 +138,33 @@ func (p *DockerProvider) Stop(id string) (*provider.ContainerInfo, error) {
 			return nil, err
 		}
 
-		p.logger.TimeInfo(start, "DockerProvider: stopped container", id, "in")
+		ch := make(chan *provider.ContainerInfo, 1)
+		ech := make(chan error, 1)
+
+		go func() {
+			for {
+				info, err := p.GetInfo(id)
+				if err != nil {
+					ech <- err
+				}
+				if info.State == "stopped" && info.Host == "" {
+					ch <- info
+				}
+				time.Sleep(time.Second * 1)
+			}
+		}()
+
+		select {
+		case info := <-ch:
+			p.logger.TimeInfo(start, "DockerProvider: stopped container", id, "in")
+			return info, nil
+		case err := <-ech:
+			return nil, err
+		case <-time.After(time.Second * 15):
+			return nil, errors.New("timeout waiting for container to stop")
+		}
 	}
+
 	return p.GetInfo(id)
 }
 
