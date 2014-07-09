@@ -277,7 +277,7 @@ var _ = Describe("provider/docker", func() {
 
 				Context("when the container is stopped", func() {
 					BeforeEach(func() {
-						err := exec.Command("docker", "stop", id).Run()
+						_, err := prov.Stop(id)
 						Expect(err).To(BeNil())
 					})
 
