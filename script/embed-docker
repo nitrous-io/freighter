@@ -6,6 +6,14 @@ cleanup() {
   docker stop $cid && docker rm $cid
 }
 
+die() {
+  echo $*
+  exit 1
+}
+
+version=$(docker version | grep 'Client version' | cut -d':' -f2 | tr -d ' ')
+docker pull ddollar/dind:$version >/dev/null 2>&1 || die "image ddollar/dind:$version does not exist"
+
 # ddollar/dind is built from https://github.com/jpetazzo/dind
 cid=$(docker run --privileged -d -p 4444 -e PORT=4444 ddollar/dind)
 host=$(docker port $cid 4444/tcp)
