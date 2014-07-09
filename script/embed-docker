@@ -6,6 +6,7 @@ cleanup() {
   docker stop $cid && docker rm $cid
 }
 
+# ddollar/dind is built from https://github.com/jpetazzo/dind
 cid=$(docker run --privileged -d -p 4444 -e PORT=4444 ddollar/dind)
 port=$(docker inspect -f '{{(index (index .NetworkSettings.Ports "4444/tcp") 0).HostPort}}' $cid)
 
