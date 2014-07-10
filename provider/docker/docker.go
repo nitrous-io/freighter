@@ -17,6 +17,13 @@ import (
 )
 
 var dockerfileUbuntu = template.Must(template.New("ubuntu").Parse(dockerfileUbuntuTmpl))
+var dockerHost = "unix:///var/run/docker.sock"
+
+func init() {
+	if host := os.Getenv("DOCKER_HOST"); host != "" {
+		dockerHost = host
+	}
+}
 
 type TemplateData struct {
 	Name  string
@@ -34,11 +41,7 @@ func NewDockerProvider(logger *util.Logger, dataPath string, containerNamespace 
 	if logger == nil || dataPath == "" || containerNamespace == "" {
 		return nil, errors.New("docker.NewDockerProvider: invalid argument")
 	}
-	host := os.Getenv("DOCKER_HOST")
-	if host == "" {
-		host = "unix:///var/run/docker.sock"
-	}
-	client, err := dockerclient.NewClient(host)
+	client, err := dockerclient.NewClient(dockerHost)
 	if err != nil {
 		return nil, err
 	}
