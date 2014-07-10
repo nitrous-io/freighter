@@ -73,7 +73,7 @@ Content-Type: application/json; charset=utf-8
 POST /containers HTTP/1.1
 Content-Type: application/x-www-form-urlencoded
 
-nameufoo&image=ubuntu-upstart:trusty
+name=foo&image=ubuntu-upstart:trusty
 ```
 
 **Example response**:
