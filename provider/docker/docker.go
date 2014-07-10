@@ -19,6 +19,8 @@ import (
 var dockerfileUbuntu = template.Must(template.New("ubuntu").Parse(dockerfileUbuntuTmpl))
 var dockerHost = "unix:///var/run/docker.sock"
 
+var errTimeout = errors.New("timeout")
+
 func init() {
 	if host := os.Getenv("DOCKER_HOST"); host != "" {
 		dockerHost = host
@@ -141,32 +143,32 @@ func (p *DockerProvider) Stop(id string) (*provider.ContainerInfo, error) {
 			return nil, err
 		}
 
-		ch := make(chan *provider.ContainerInfo, 1)
-		ech := make(chan error, 1)
+		ch := make(chan error, 1)
 
 		go func() {
 			for {
-				info, err := p.GetInfo(id)
-				if err != nil {
-					ech <- err
+				select {
+				case <-time.After(15 * time.Second):
+					ch <- errTimeout
 					return
+				default:
+					info, err := p.GetInfo(id)
+					if err != nil {
+						ch <- err
+						return
+					}
+					if info.State == provider.ContainerStateStopped && info.Host == "" {
+						p.logger.TimeInfo(start, "DockerProvider: stopped container", id)
+						ch <- nil
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
 				}
-				if info.State == "stopped" && info.Host == "" {
-					ch <- info
-					return
-				}
-				time.Sleep(time.Second * 1)
 			}
 		}()
 
-		select {
-		case info := <-ch:
-			p.logger.TimeInfo(start, "DockerProvider: stopped container", id, "in")
-			return info, nil
-		case err := <-ech:
+		if err := <-ch; err != nil {
 			return nil, err
-		case <-time.After(time.Second * 15):
-			return nil, errors.New("timeout waiting for container to stop")
 		}
 	}
 
