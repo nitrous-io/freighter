@@ -146,9 +146,10 @@ func (p *DockerProvider) Stop(id string) (*provider.ContainerInfo, error) {
 		ch := make(chan error, 1)
 
 		go func() {
+			timeout := time.After(15 * time.Second)
 			for {
 				select {
-				case <-time.After(15 * time.Second):
+				case <-timeout:
 					ch <- errTimeout
 					return
 				default:
