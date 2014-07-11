@@ -1,13 +1,31 @@
 #!/usr/bin/env bash
 
-APP=freighter
-mkdir -p $HOME/.freighterd-cache
+tmp=$(mktemp -t docker_XXXXX)
 
-script/make-image
+cleanup() {
+  docker stop $cid && docker rm $cid
+}
 
-docker run \
-  --privileged \
-  --rm=true \
-  --volume $(pwd):/opt/src/github.com/nitrous-io/$APP \
-  --volume $HOME/.freighterd-cache:/var/lib/docker \
-  registry.nitrous.io/$APP script/start-docker script/test
+die() {
+  echo $*
+  exit 1
+}
+
+version=$(docker version | grep 'Client version' | cut -d':' -f2 | tr -d ' ')
+docker pull ddollar/dind:$version >/dev/null 2>&1 || die "image ddollar/dind:$version does not exist"
+
+cache=$HOME/.freighterd-cache
+mkdir -p $cache
+
+# ddollar/dind is built from https://github.com/jpetazzo/dind
+cid=$(docker run --privileged -d --volume $cache:/var/lib/docker -p 4444 -e PORT=4444 ddollar/dind)
+host=$(docker port $cid 4444/tcp)
+
+trap cleanup EXIT
+
+OLD_DOCKER_HOST=$DOCKER_HOST
+export DOCKER_HOST=tcp://$host
+
+make test
+
+DOCKER_HOST=$OLD_DOCKER_HOST
