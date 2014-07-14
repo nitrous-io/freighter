@@ -106,7 +106,6 @@ func (p *MockProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 	info, _ := p.GetInfo(id)
 	if info != nil {
 		info.Host = ""
-		/* info.SSHPort = 0*/
 		info.State = ""
 	}
 	p.TerminateCalled = true
