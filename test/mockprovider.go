@@ -47,6 +47,9 @@ type MockProvider struct {
 
 	Containers []*provider.ContainerInfo
 	PublicKeys map[string]string
+
+	ExportCalled     bool
+	ReceivedIOWriter io.Writer
 }
 
 func (p *MockProvider) List() ([]*provider.ContainerInfo, error) {
@@ -144,4 +147,12 @@ func (p *MockProvider) Export(id string, output io.Writer) error {
 
 func (p *MockProvider) IsNotFoundError(err error) bool {
 	return err == ErrMockProviderContainerNotFound
+}
+
+func (p *MockProvider) Export(id string, output io.Writer) error {
+	p.ExportCalled = true
+	p.ReceivedID = id
+	p.ReceivedIOWriter = output
+
+	return nil
 }
