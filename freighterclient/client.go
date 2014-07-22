@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,11 +91,15 @@ type Client interface {
 
 	RegistryLogin(host *Host, params *RegistryAuth) error
 	RegistryLogout(host *Host, registry string) error
+
+	ListImages(host *Host, showAll bool) ([]*Image, error)
 }
 
 type (
 	Container       provider.ContainerInfo
 	ContainerConfig provider.ContainerConfig
+
+	Image provider.ImageInfo
 
 	containerResponse struct {
 		*Container `json:"container"`
@@ -106,6 +111,10 @@ type (
 
 	containersResponse struct {
 		Containers []*Container `json:"containers"`
+	}
+
+	listImagesResponse struct {
+		Images []*Image `json:"images"`
 	}
 
 	errorResponse struct {
@@ -477,6 +486,35 @@ func (c *client) RemovePublicKey(h *Host, id string, fingerprint string) error {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	return c.doPublicKeyOp(req)
+}
+
+// ListImages makes an API request to a given Freighter Host and returns a list of
+// Images.
+func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
+	u := h.BaseURL() + "/images?showAll=%v"
+	formatedUrl := fmt.Sprintf(u, strconv.FormatBool(showAll))
+	req, err := http.NewRequest("GET", formatedUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, &RequestFailedError{Req: req, Err: err}
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, &StatusError{resp.StatusCode}
+	}
+
+	var images listImagesResponse
+	err = json.NewDecoder(resp.Body).Decode(&images)
+	resp.Body.Close()
+	if err != nil {
+		return nil, ErrUnexpectedResponse
+	}
+
+	return images.Images, nil
 }
 
 func (c *client) containerControl(h *Host, id string, action string) (*Container, error) {

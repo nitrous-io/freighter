@@ -57,6 +57,11 @@ type MockClient struct {
 	ReceivedPassword string
 	ReceivedEmail    string
 	ReceivedRegistry string
+
+	ListImagesCalled      int
+	ListImagesShowAllArgs bool
+	ListImagesArray       []*Image
+	ListImagesError       error
 }
 
 func (c *MockClient) List(h *Host) ([]*Container, error) {
@@ -182,6 +187,13 @@ func (c *MockClient) RegistryLogout(h *Host, registry string) error {
 	c.ReceivedRegistry = registry
 
 	return c.RegistryLogoutError
+}
+
+func (c *MockClient) ListImages(h *Host, showAll bool) ([]*Image, error) {
+	c.ListImagesCalled = c.ListImagesCalled + 1
+	c.ListImagesShowAllArgs = showAll
+
+	return c.ListImagesArray, c.ListImagesError
 }
 
 func (c *MockClient) DockerContainerConfig() (*docker.ContainerConfig, error) {

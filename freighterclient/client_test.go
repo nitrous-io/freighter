@@ -1104,4 +1104,186 @@ var _ = Describe("client", func() {
 			})
 		})
 	})
+
+	Describe("Image Operations", func() {
+		var (
+			client freighterclient.Client
+			host   *freighterclient.Host
+
+			server       *ghttp.Server
+			handlers     http.HandlerFunc
+			statusCode   int
+			responseBody string
+		)
+
+		setupServer := func(method, url, query string) {
+			handlers = ghttp.CombineHandlers(
+				func(w http.ResponseWriter, req *http.Request) {
+					// Call ParseForm() so that server.ReceivedRequests() have
+					// POST params populated.
+					err := req.ParseForm()
+					Expect(err).To(BeNil())
+				},
+				ghttp.VerifyRequest(method, url, query),
+				ghttp.VerifyContentType("application/x-www-form-urlencoded"),
+				ghttp.RespondWithPtr(&statusCode, &responseBody),
+			)
+
+			server = ghttp.NewServer()
+			server.AppendHandlers(handlers)
+
+			ip, port := IPAndPort(server)
+			host = &freighterclient.Host{Host: ip, Port: port, Secure: false}
+			client = freighterclient.NewClient(nil)
+		}
+
+		teardownServer := func() {
+			if server.HTTPTestServer != nil {
+				server.Close()
+			}
+		}
+
+		Describe("ListImages()", func() {
+
+			Context("with false showAll", func() {
+
+				BeforeEach(func() {
+					setupServer("GET", "/images", "showAll=false")
+				})
+
+				AfterEach(func() {
+					teardownServer()
+				})
+
+				It("should pass through showAll false state", func() {
+					client.ListImages(host, false)
+
+					receivedRequests := server.ReceivedRequests()
+					Expect(receivedRequests).To(HaveLen(1))
+				})
+
+			})
+
+			Context("with true showAll", func() {
+
+				BeforeEach(func() {
+					setupServer("GET", "/images", "showAll=true")
+				})
+
+				AfterEach(func() {
+					teardownServer()
+				})
+
+				It("should pass through showAll true state", func() {
+					client.ListImages(host, true)
+
+					receivedRequests := server.ReceivedRequests()
+					Expect(receivedRequests).To(HaveLen(1))
+				})
+
+			})
+
+			Context("with connect failures", func() {
+
+				BeforeEach(func() {
+					setupServer("GET", "/images", "showAll=true")
+				})
+
+				AfterEach(func() {
+					teardownServer()
+				})
+
+				It("should surface request failures", func() {
+					teardownServer()
+
+					images, err := client.ListImages(host, true)
+					Expect(err).NotTo(BeNil())
+					_, ok := err.(*freighterclient.RequestFailedError)
+					Expect(ok).To(BeTrue())
+					Expect(server.ReceivedRequests()).To(HaveLen(0))
+					Expect(images).To(BeNil())
+				})
+
+				It("should surface respone failures in StatusErr", func() {
+					statusCode = http.StatusInternalServerError
+					images, err := client.ListImages(host, true)
+
+					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
+					Expect(images).To(BeNil())
+				})
+
+			})
+
+			Context("parsing body", func() {
+
+				BeforeEach(func() {
+					setupServer("GET", "/images", "showAll=true")
+				})
+
+				AfterEach(func() {
+					teardownServer()
+				})
+
+				It("should handle JSON decoding errors", func() {
+					statusCode = http.StatusOK
+					responseBody = `<<???>>`
+
+					images, err := client.ListImages(host, true)
+					Expect(err).To(Equal(freighterclient.ErrUnexpectedResponse))
+					Expect(images).To(BeNil())
+				})
+
+				It("should be capable of extracting an Images response", func() {
+					statusCode = http.StatusOK
+					responseBody = `{
+						"images": [
+							{
+								"id": "12",
+								"parent_id": "19",
+								"source": "source1",
+								"source_tag": "sourcetag1",
+								"created_at": 1902,
+								"actual_size": 12,
+								"virtual_size": 39
+							},
+							{
+								"id": "13",
+								"parent_id": "21",
+								"source": "source2",
+								"source_tag": "sourcetag2",
+								"created_at": 1901,
+								"actual_size": 10,
+								"virtual_size": 48
+							}
+						]
+					}`
+
+					images, err := client.ListImages(host, true)
+					Expect(err).To(BeNil())
+					Expect(images).To(HaveLen(2))
+
+					Expect(images[0]).To(Equal(&freighterclient.Image{
+						ID:          "12",
+						ParentID:    "19",
+						Source:      "source1",
+						SourceTag:   "sourcetag1",
+						CreatedAt:   1902,
+						ActualSize:  12,
+						VirtualSize: 39,
+					}))
+
+					Expect(images[1]).To(Equal(&freighterclient.Image{
+						ID:          "13",
+						ParentID:    "21",
+						Source:      "source2",
+						SourceTag:   "sourcetag2",
+						CreatedAt:   1901,
+						ActualSize:  10,
+						VirtualSize: 48,
+					}))
+				})
+
+			})
+		})
+	})
 })
