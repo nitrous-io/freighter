@@ -508,6 +508,7 @@ func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, &StatusError{resp.StatusCode}
@@ -515,7 +516,6 @@ func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
 
 	var images listImagesResponse
 	err = json.NewDecoder(resp.Body).Decode(&images)
-	resp.Body.Close()
 	if err != nil {
 		return nil, ErrUnexpectedResponse
 	}
