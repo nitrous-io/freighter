@@ -873,4 +873,95 @@ var _ = Describe("server", func() {
 			})
 		}
 	})
+
+	Describe("GET /images", func() {
+		var params *url.Values
+
+		BeforeEach(func() {
+			params = &url.Values{}
+		})
+
+		doRequest := func() {
+			req, err = NewRequest("GET", "/images", params)
+			Expect(err).To(BeNil())
+			handler.ServeHTTP(res, req)
+		}
+
+		It("calls provider.ListImages()", func() {
+			Expect(prov.ListImagesCalled).To(BeFalse())
+			doRequest()
+			Expect(prov.ListImagesCalled).To(BeTrue())
+		})
+
+		It("should expose the contents under `images`", func() {
+			content1 := &provider.ImageInfo{
+				ID:          "ID1",
+				ParentID:    "Par1",
+				Source:      "Source1",
+				SourceTag:   "SourceTag1",
+				CreatedAt:   1975,
+				ActualSize:  12,
+				VirtualSize: 19,
+			}
+			content2 := &provider.ImageInfo{
+				ID:          "ID2",
+				ParentID:    "Par2",
+				Source:      "Source2",
+				SourceTag:   "SourceTag2",
+				CreatedAt:   1901,
+				ActualSize:  40,
+				VirtualSize: 28,
+			}
+			prov.ListImagesContents = []*provider.ImageInfo{content1, content2}
+			doRequest()
+
+			j, err := json.Marshal(map[string]interface{}{
+				"images": prov.ListImagesContents,
+			})
+			Expect(err).To(BeNil())
+
+			Expect(res.Body.String()).To(MatchJSON(string(j)))
+		})
+
+		Context("showAll control", func() {
+
+			It("should not showAll by default", func() {
+				doRequest()
+				Expect(prov.ListImagesShowAllArg).To(BeFalse())
+			})
+
+			It("should pass down showAll when false", func() {
+				params.Set("showAll", "0")
+				doRequest()
+				Expect(prov.ListImagesShowAllArg).To(BeFalse())
+			})
+
+			It("should pass down showAll when true", func() {
+				params.Set("showAll", "1")
+				doRequest()
+				Expect(prov.ListImagesShowAllArg).To(BeTrue())
+			})
+
+			It("should handle bad showAll value", func() {
+				params.Set("showAll", "Ha, not even a boolean")
+				doRequest()
+				Expect(prov.ListImagesCalled).To(BeFalse())
+				Expect(res.Code).To(Equal(http.StatusBadRequest))
+				Expect(res.Body.String()).To(MatchJSON(`{"error":"Invalid boolean for showAll"}`))
+			})
+
+		})
+
+		Context("ListImages() returns an error", func() {
+			BeforeEach(func() {
+				prov.ListImagesError = errors.New("Could not contact cloud.")
+			})
+
+			It("should pass through the failure", func() {
+				doRequest()
+				Expect(res.Code).To(Equal(http.StatusInternalServerError))
+				Expect(res.Body.String()).To(MatchJSON(`{"error":"Could not contact cloud."}`))
+			})
+		})
+	})
 })

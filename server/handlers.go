@@ -277,6 +277,27 @@ func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func (s *Server) listImages(w http.ResponseWriter, r *http.Request) {
+	showAllStr := r.FormValue("showAll")
+	showAll := false
+	if len(showAllStr) != 0 {
+		var err error
+		showAll, err = strconv.ParseBool(showAllStr)
+		if err != nil {
+			s.respondEncodeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": "Invalid boolean for showAll"})
+			return
+		}
+	}
+
+	listing, err := s.provider.ListImages(showAll)
+	if err != nil {
+		s.handleError(w, err)
+		return
+	}
+
+	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"images": listing})
+}
+
 func hijackServer(w http.ResponseWriter) (io.ReadCloser, io.Writer, error) {
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
