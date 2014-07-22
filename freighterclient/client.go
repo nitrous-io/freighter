@@ -113,10 +113,6 @@ type (
 		Containers []*Container `json:"containers"`
 	}
 
-	listImagesResponse struct {
-		Images []*Image `json:"images"`
-	}
-
 	errorResponse struct {
 		Error string `json:error`
 	}
@@ -515,7 +511,9 @@ func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
 		return nil, &StatusError{resp.StatusCode}
 	}
 
-	var images listImagesResponse
+	var images struct {
+		Images []*Image `json:"images"`
+	}
 	err = json.NewDecoder(resp.Body).Decode(&images)
 	if err != nil {
 		return nil, ErrUnexpectedResponse
