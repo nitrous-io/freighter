@@ -178,10 +178,11 @@ func (c *client) List(h *Host) ([]*Container, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.Do(req)
+	resp, err := performRequest(c, req)
 	if err != nil {
-		return nil, &RequestFailedError{Req: req, Err: err}
+		return nil, err
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, &StatusError{resp.StatusCode}
 	}
@@ -218,10 +219,11 @@ func (c *client) Create(h *Host, name, image string, config ContainerConfig) (*C
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := c.Do(req)
+	resp, err := performRequest(c, req)
 	if err != nil {
-		return nil, &RequestFailedError{Req: req, Err: err}
+		return nil, err
 	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		// Success, do nothing.
@@ -253,10 +255,11 @@ func (c *client) Info(h *Host, id string) (*Container, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.Do(req)
+	resp, err := performRequest(c, req)
 	if err != nil {
-		return nil, &RequestFailedError{Req: req, Err: err}
+		return nil, err
 	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		// Success, do nothing.
@@ -305,10 +308,11 @@ func (c *client) Terminate(h *Host, id string) (*Container, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.Do(req)
+	resp, err := performRequest(c, req)
 	if err != nil {
-		return nil, &RequestFailedError{Req: req, Err: err}
+		return nil, err
 	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		// Success, do nothing.
@@ -419,10 +423,11 @@ func (c *client) RegistryLogout(h *Host, registry string) error {
 }
 
 func (c *client) doPublicKeyOp(req *http.Request) error {
-	resp, err := c.Do(req)
+	resp, err := performRequest(c, req)
 	if err != nil {
-		return &RequestFailedError{Req: req, Err: err}
+		return err
 	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return nil
@@ -499,10 +504,11 @@ func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := c.Do(req)
+	resp, err := performRequest(c, req)
 	if err != nil {
-		return nil, &RequestFailedError{Req: req, Err: err}
+		return nil, err
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, &StatusError{resp.StatusCode}
 	}
@@ -525,10 +531,11 @@ func (c *client) containerControl(h *Host, id string, action string) (*Container
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := c.Do(req)
+	resp, err := performRequest(c, req)
 	if err != nil {
-		return nil, &RequestFailedError{Req: req, Err: err}
+		return nil, err
 	}
+
 	switch resp.StatusCode {
 	case http.StatusOK:
 		// Success, do nothing.
@@ -543,6 +550,14 @@ func (c *client) containerControl(h *Host, id string, action string) (*Container
 		return nil, err
 	}
 	return containerResp.Container, nil
+}
+
+func performRequest(c *client, req *http.Request) (*http.Response, error) {
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, &RequestFailedError{Req: req, Err: err}
+	}
+	return resp, nil
 }
 
 func unmarshalContainerResponse(resp *http.Response) (*containerResponse, error) {
