@@ -796,7 +796,7 @@ var _ = Describe("provider/docker", func() {
 		})
 	})
 
-	FDescribe(".ListImages()", func() {
+	Describe(".ListImages()", func() {
 
 		imageSize := func(id string) int64 {
 			sizeInspect := doInspect(id, "{{.Size}}")
