@@ -182,6 +182,7 @@ func (c *client) List(h *Host) ([]*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, &StatusError{resp.StatusCode}
@@ -189,7 +190,7 @@ func (c *client) List(h *Host) ([]*Container, error) {
 
 	var containers containersResponse
 	err = json.NewDecoder(resp.Body).Decode(&containers)
-	resp.Body.Close()
+
 	if err != nil {
 		return nil, ErrUnexpectedResponse
 	}
