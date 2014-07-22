@@ -496,7 +496,7 @@ func (c *client) RemovePublicKey(h *Host, id string, fingerprint string) error {
 // ListImages makes an API request to a given Freighter Host and returns a list of
 // Images.
 func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
-	u := h.BaseURL() + "/images?showAll=%v"
+	u := h.BaseURL() + "/images?show_all=%v"
 	formatedUrl := fmt.Sprintf(u, strconv.FormatBool(showAll))
 	req, err := http.NewRequest("GET", formatedUrl, nil)
 	if err != nil {

@@ -931,23 +931,23 @@ var _ = Describe("server", func() {
 			})
 
 			It("should pass down showAll when false", func() {
-				params.Set("showAll", "0")
+				params.Set("show_all", "0")
 				doRequest()
 				Expect(prov.ListImagesShowAllArg).To(BeFalse())
 			})
 
 			It("should pass down showAll when true", func() {
-				params.Set("showAll", "1")
+				params.Set("show_all", "1")
 				doRequest()
 				Expect(prov.ListImagesShowAllArg).To(BeTrue())
 			})
 
 			It("should handle bad showAll value", func() {
-				params.Set("showAll", "Ha, not even a boolean")
+				params.Set("show_all", "Ha, not even a boolean")
 				doRequest()
 				Expect(prov.ListImagesCalled).To(BeFalse())
 				Expect(res.Code).To(Equal(http.StatusBadRequest))
-				Expect(res.Body.String()).To(MatchJSON(`{"error":"Invalid boolean for showAll"}`))
+				Expect(res.Body.String()).To(MatchJSON(`{"error":"Invalid boolean for show_all"}`))
 			})
 
 		})

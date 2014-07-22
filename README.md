@@ -638,7 +638,7 @@ GET /images HTTP/1.1
 
 **Query Params**:
 
-- **showAll** - _(optional)_ show all the available images (intermediate layers)
+- **show_all** - _(optional)_ show all the available images (intermediate layers)
 
 **Example response**:
 

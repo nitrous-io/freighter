@@ -1148,7 +1148,7 @@ var _ = Describe("client", func() {
 			Context("with false showAll", func() {
 
 				BeforeEach(func() {
-					setupServer("GET", "/images", "showAll=false")
+					setupServer("GET", "/images", "show_all=false")
 				})
 
 				AfterEach(func() {
@@ -1167,7 +1167,7 @@ var _ = Describe("client", func() {
 			Context("with true showAll", func() {
 
 				BeforeEach(func() {
-					setupServer("GET", "/images", "showAll=true")
+					setupServer("GET", "/images", "show_all=true")
 				})
 
 				AfterEach(func() {
@@ -1186,7 +1186,7 @@ var _ = Describe("client", func() {
 			Context("with connect failures", func() {
 
 				BeforeEach(func() {
-					setupServer("GET", "/images", "showAll=true")
+					setupServer("GET", "/images", "show_all=true")
 				})
 
 				AfterEach(func() {
@@ -1217,7 +1217,7 @@ var _ = Describe("client", func() {
 			Context("parsing body", func() {
 
 				BeforeEach(func() {
-					setupServer("GET", "/images", "showAll=true")
+					setupServer("GET", "/images", "show_all=true")
 				})
 
 				AfterEach(func() {
