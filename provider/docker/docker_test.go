@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -792,5 +794,106 @@ var _ = Describe("provider/docker", func() {
 			Expect(doInspect(volsID, `{{.HostConfig.VolumesFrom}}`)).To(
 				Equal(fmt.Sprintf("[%s]", id)))
 		})
+	})
+
+	FDescribe(".ListImages()", func() {
+
+		imageSize := func(id string) int64 {
+			sizeInspect := doInspect(id, "{{.Size}}")
+			parsedSize, err := strconv.ParseInt(sizeInspect, 10, 64)
+			Expect(err).To(BeNil())
+			return parsedSize
+		}
+
+		createSameImages := func() {
+			dockerSource := `
+			FROM %s
+			MAINTAINER Nitrous.IO, hello@nitrous.io
+
+			CMD /bin/bash
+			`
+			interpolated := fmt.Sprintf(dockerSource, image)
+			dockerLoc, err := ioutil.TempDir("", "DockerTest")
+			Expect(err).To(BeNil())
+			fileLoc := filepath.Join(dockerLoc, "Dockerfile")
+			dockerFile, err := os.Create(fileLoc)
+			Expect(err).To(BeNil())
+			dockerFile.WriteString(interpolated)
+			dockerFile.Close()
+
+			exec.Command("docker", "build", "-t", "dockertest:clone1", dockerLoc).Run()
+			exec.Command("docker", "build", "-t", "dockertest:clone2", dockerLoc).Run()
+
+			err = os.Remove(fileLoc)
+			Expect(err).To(BeNil())
+			err = os.Remove(dockerLoc)
+			Expect(err).To(BeNil())
+		}
+
+		It("should fetch the basic info about an Image", func() {
+			imageList, _ := prov.ListImages(false)
+
+			splitSet := strings.Split(image, ":")
+			Expect(splitSet).To(HaveLen(2))
+
+			var target *provider.ImageInfo
+			for _, imageInf := range imageList {
+				if imageInf.Source == splitSet[0] && imageInf.SourceTag == splitSet[1] {
+					target = imageInf
+					break
+				}
+			}
+
+			Expect(target).ToNot(BeNil())
+			Expect(target.ActualSize).To(Equal(imageSize(target.ID)))
+			Expect(target.ParentID).To(Equal(doInspect(target.ID, "{{.Parent}}")))
+
+			timeStr := doInspect(target.ID, "{{.Created}}")
+			expectingTime, err := time.Parse(time.RFC3339, timeStr)
+			Expect(err).To(BeNil())
+			expectingUTime := expectingTime.Unix()
+			Expect(target.CreatedAt).To(Equal(expectingUTime))
+		})
+
+		Context("when the same image is under multiple repositories", func() {
+			BeforeEach(func() {
+				createSameImages()
+			})
+
+			AfterEach(func() {
+				exec.Command("docker", "rmi", "dockertest:clone1").Run()
+				exec.Command("docker", "rmi", "dockertest:clone2").Run()
+			})
+
+			It("should break them out into separate entries", func() {
+				imageList, _ := prov.ListImages(false)
+
+				splitSet := strings.Split(image, ":")
+				Expect(splitSet).To(HaveLen(2))
+
+				var target1 *provider.ImageInfo
+				var target2 *provider.ImageInfo
+				for _, imageInf := range imageList {
+					if imageInf.Source == "dockertest" {
+						switch imageInf.SourceTag {
+						case "clone1":
+							target1 = imageInf
+						case "clone2":
+							target2 = imageInf
+						}
+					}
+
+					if target1 != nil && target2 != nil {
+						break
+					}
+				}
+
+				Expect(target1).ToNot(BeNil())
+				Expect(target2).ToNot(BeNil())
+				Expect(target2.ID).To(Equal(target1.ID))
+				Expect(target2.ParentID).To(Equal(target2.ParentID))
+			})
+		})
+
 	})
 })

@@ -34,6 +34,8 @@ type Provider interface {
 
 	Login(username, password, email, registry string) error
 	Logout(registry string) error
+
+	ListImages(showAll bool) (infoList []*ImageInfo, err error)
 }
 
 type ContainerInfo struct {
@@ -47,6 +49,16 @@ type ContainerInfo struct {
 
 type ContainerConfig interface {
 	json.Marshaler
+}
+
+type ImageInfo struct {
+	ID          string `json:"id"`
+	ParentID    string `json:"parent_id"`
+	Source      string `json:"source"`
+	SourceTag   string `json:"source_tag"`
+	CreatedAt   int64  `json:"created_at"`
+	ActualSize  int64  `json:"actual_size"`
+	VirtualSize int64  `json:"virtual_size"`
 }
 
 const (

@@ -194,6 +194,11 @@ func (p *MockProvider) Logout(registry string) error {
 	return p.LogoutError
 }
 
+func (p *MockProvider) ListImages(showAll bool) ([]*provider.ImageInfo, error) {
+	// no-op
+	return nil, nil
+}
+
 func (p *MockProvider) IsNotFoundError(err error) bool {
 	return err == ErrMockProviderContainerNotFound
 }
