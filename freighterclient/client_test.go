@@ -1125,7 +1125,7 @@ var _ = Describe("client", func() {
 					Expect(err).To(BeNil())
 				},
 				ghttp.VerifyRequest(method, url, query),
-				ghttp.VerifyContentType("application/x-www-form-urlencoded"),
+				ghttp.VerifyContentType("application/json"),
 				ghttp.RespondWithPtr(&statusCode, &responseBody),
 			)
 

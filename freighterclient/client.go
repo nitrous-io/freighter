@@ -497,7 +497,7 @@ func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := performRequest(c, req)
 	if err != nil {
