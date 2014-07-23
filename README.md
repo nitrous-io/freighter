@@ -672,7 +672,7 @@ Content-Type: application/json; charset=utf-8
 
 **Status Codes**:
 
-- **200** - no error
+- **200** - ok
 
 - - -
 Copyright (c) 2014 Irrational Industries, Inc. d.b.a. Nitrous.IO. All Rights Reserved.
