@@ -91,7 +91,7 @@ type Client interface {
 	RegistryLogin(host *Host, params *RegistryAuth) error
 	RegistryLogout(host *Host, registry string) error
 
-	ListImages(host *Host, showAll bool) ([]*Image, error)
+	ListImages(host *Host) ([]*Image, error)
 }
 
 type (
@@ -491,8 +491,8 @@ func (c *client) RemovePublicKey(h *Host, id string, fingerprint string) error {
 
 // ListImages makes an API request to a given Freighter Host and returns a list of
 // Images.
-func (c *client) ListImages(h *Host, showAll bool) ([]*Image, error) {
-	formattedURL := fmt.Sprintf("%s/images?show_all=%t", h.BaseURL(), showAll)
+func (c *client) ListImages(h *Host) ([]*Image, error) {
+	formattedURL := fmt.Sprintf("%s/images", h.BaseURL())
 	req, err := http.NewRequest("GET", formattedURL, nil)
 	if err != nil {
 		return nil, err

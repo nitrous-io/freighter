@@ -1116,13 +1116,13 @@ var _ = Describe("client", func() {
 			responseBody string
 		)
 
-		setupServer := func(method, url, query string) {
+		setupServer := func(method, url string) {
 			handlers = ghttp.CombineHandlers(
 				func(w http.ResponseWriter, req *http.Request) {
 					err := req.ParseForm()
 					Expect(err).To(BeNil())
 				},
-				ghttp.VerifyRequest(method, url, query),
+				ghttp.VerifyRequest(method, url),
 				ghttp.VerifyContentType("application/json"),
 				ghttp.RespondWithPtr(&statusCode, &responseBody),
 			)
@@ -1139,48 +1139,10 @@ var _ = Describe("client", func() {
 
 		Describe("ListImages()", func() {
 
-			Context("with false showAll", func() {
-
-				BeforeEach(func() {
-					setupServer("GET", "/images", "show_all=false")
-				})
-
-				AfterEach(func() {
-					teardownServer()
-				})
-
-				It("should pass through showAll false state", func() {
-					client.ListImages(host, false)
-
-					receivedRequests := server.ReceivedRequests()
-					Expect(receivedRequests).To(HaveLen(1))
-				})
-
-			})
-
-			Context("with true showAll", func() {
-
-				BeforeEach(func() {
-					setupServer("GET", "/images", "show_all=true")
-				})
-
-				AfterEach(func() {
-					teardownServer()
-				})
-
-				It("should pass through showAll true state", func() {
-					client.ListImages(host, true)
-
-					receivedRequests := server.ReceivedRequests()
-					Expect(receivedRequests).To(HaveLen(1))
-				})
-
-			})
-
 			Context("with failures communicating with endpoint", func() {
 
 				BeforeEach(func() {
-					setupServer("GET", "/images", "show_all=true")
+					setupServer("GET", "/images")
 				})
 
 				AfterEach(func() {
@@ -1190,7 +1152,7 @@ var _ = Describe("client", func() {
 				It("should surface request failures", func() {
 					teardownServer()
 
-					images, err := client.ListImages(host, true)
+					images, err := client.ListImages(host)
 					Expect(err).NotTo(BeNil())
 					_, ok := err.(*freighterclient.RequestFailedError)
 					Expect(ok).To(BeTrue())
@@ -1200,7 +1162,7 @@ var _ = Describe("client", func() {
 
 				It("should surface response failures in StatusErr", func() {
 					statusCode = http.StatusInternalServerError
-					images, err := client.ListImages(host, true)
+					images, err := client.ListImages(host)
 
 					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
 					Expect(images).To(BeNil())
@@ -1211,7 +1173,7 @@ var _ = Describe("client", func() {
 			Context("parsing body", func() {
 
 				BeforeEach(func() {
-					setupServer("GET", "/images", "show_all=true")
+					setupServer("GET", "/images")
 				})
 
 				AfterEach(func() {
@@ -1222,7 +1184,7 @@ var _ = Describe("client", func() {
 					statusCode = http.StatusOK
 					responseBody = `<<???>>`
 
-					images, err := client.ListImages(host, true)
+					images, err := client.ListImages(host)
 					Expect(err).To(Equal(freighterclient.ErrUnexpectedResponse))
 					Expect(images).To(BeNil())
 				})
@@ -1233,9 +1195,8 @@ var _ = Describe("client", func() {
 						"images": [
 							{
 								"id": "12",
-								"parent_id": "19",
-								"source": "source1",
-								"source_tag": "sourcetag1",
+								"name": "source1",
+								"tag": "sourcetag1",
 								"created_at": 1902,
 								"actual_size": 12,
 								"virtual_size": 39
@@ -1243,8 +1204,8 @@ var _ = Describe("client", func() {
 							{
 								"id": "13",
 								"parent_id": "21",
-								"source": "source2",
-								"source_tag": "sourcetag2",
+								"name": "source2",
+								"tag": "sourcetag2",
 								"created_at": 1901,
 								"actual_size": 10,
 								"virtual_size": 48
@@ -1252,15 +1213,14 @@ var _ = Describe("client", func() {
 						]
 					}`
 
-					images, err := client.ListImages(host, true)
+					images, err := client.ListImages(host)
 					Expect(err).To(BeNil())
 					Expect(images).To(HaveLen(2))
 
 					Expect(images[0]).To(Equal(&freighterclient.Image{
 						ID:          "12",
-						ParentID:    "19",
-						Source:      "source1",
-						SourceTag:   "sourcetag1",
+						Name:        "source1",
+						Tag:         "sourcetag1",
 						CreatedAt:   1902,
 						ActualSize:  12,
 						VirtualSize: 39,
@@ -1268,9 +1228,8 @@ var _ = Describe("client", func() {
 
 					Expect(images[1]).To(Equal(&freighterclient.Image{
 						ID:          "13",
-						ParentID:    "21",
-						Source:      "source2",
-						SourceTag:   "sourcetag2",
+						Name:        "source2",
+						Tag:         "sourcetag2",
 						CreatedAt:   1901,
 						ActualSize:  10,
 						VirtualSize: 48,

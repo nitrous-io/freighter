@@ -58,10 +58,9 @@ type MockClient struct {
 	ReceivedEmail    string
 	ReceivedRegistry string
 
-	ListImagesCalled      int
-	ListImagesShowAllArgs bool
-	ListImagesArray       []*Image
-	ListImagesError       error
+	ListImagesCalled int
+	ListImagesArray  []*Image
+	ListImagesError  error
 }
 
 func (c *MockClient) List(h *Host) ([]*Container, error) {
@@ -189,9 +188,8 @@ func (c *MockClient) RegistryLogout(h *Host, registry string) error {
 	return c.RegistryLogoutError
 }
 
-func (c *MockClient) ListImages(h *Host, showAll bool) ([]*Image, error) {
+func (c *MockClient) ListImages(h *Host) ([]*Image, error) {
 	c.ListImagesCalled = c.ListImagesCalled + 1
-	c.ListImagesShowAllArgs = showAll
 
 	return c.ListImagesArray, c.ListImagesError
 }
