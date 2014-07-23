@@ -77,5 +77,5 @@ func (s *Server) drawRoutes() {
 	s.route("/registry/auth", s.loginRegistry, "POST")
 	s.route("/registry/auth", s.logoutRegistry, "DELETE")
 
-    s.route("/images", s.listImages, "GET")
+	s.route("/images", s.listImages, "GET")
 }
