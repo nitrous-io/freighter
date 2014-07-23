@@ -630,15 +630,11 @@ width=100&height=80
 - **202** - accepted
 - **404** - no such shell session
 
-### Listing images on a host
+### Listing freighter managed images on a host
 
 ```
 GET /images HTTP/1.1
 ```
-
-**Query Params**:
-
-- **show_all** - _(optional)_ show all the available images (intermediate layers)
 
 **Example response**:
 

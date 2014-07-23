@@ -278,18 +278,7 @@ func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) listImages(w http.ResponseWriter, r *http.Request) {
-	showAllStr := r.FormValue("show_all")
-	showAll := false
-	if len(showAllStr) != 0 {
-		var err error
-		showAll, err = strconv.ParseBool(showAllStr)
-		if err != nil {
-			s.respondEncodeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": "Invalid boolean for show_all"})
-			return
-		}
-	}
-
-	listing, err := s.provider.ListImages(showAll)
+	listing, err := s.provider.ListImages()
 	if err != nil {
 		s.handleError(w, err)
 		return

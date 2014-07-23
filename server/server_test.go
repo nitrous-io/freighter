@@ -896,18 +896,16 @@ var _ = Describe("server", func() {
 		It("should expose the contents under `images`", func() {
 			content1 := &provider.ImageInfo{
 				ID:          "ID1",
-				ParentID:    "Par1",
-				Source:      "Source1",
-				SourceTag:   "SourceTag1",
+				Name:        "Source1",
+				Tag:         "SourceTag1",
 				CreatedAt:   1975,
 				ActualSize:  12,
 				VirtualSize: 19,
 			}
 			content2 := &provider.ImageInfo{
 				ID:          "ID2",
-				ParentID:    "Par2",
-				Source:      "Source2",
-				SourceTag:   "SourceTag2",
+				Name:        "Source2",
+				Tag:         "SourceTag2",
 				CreatedAt:   1901,
 				ActualSize:  40,
 				VirtualSize: 28,
@@ -921,35 +919,6 @@ var _ = Describe("server", func() {
 			Expect(err).To(BeNil())
 
 			Expect(res.Body.String()).To(MatchJSON(string(j)))
-		})
-
-		Context("showAll control", func() {
-
-			It("should not showAll by default", func() {
-				doRequest()
-				Expect(prov.ListImagesShowAllArg).To(BeFalse())
-			})
-
-			It("should pass down showAll when false", func() {
-				params.Set("show_all", "0")
-				doRequest()
-				Expect(prov.ListImagesShowAllArg).To(BeFalse())
-			})
-
-			It("should pass down showAll when true", func() {
-				params.Set("show_all", "1")
-				doRequest()
-				Expect(prov.ListImagesShowAllArg).To(BeTrue())
-			})
-
-			It("should handle bad showAll value", func() {
-				params.Set("show_all", "Ha, not even a boolean")
-				doRequest()
-				Expect(prov.ListImagesCalled).To(BeFalse())
-				Expect(res.Code).To(Equal(http.StatusBadRequest))
-				Expect(res.Body.String()).To(MatchJSON(`{"error":"Invalid boolean for show_all"}`))
-			})
-
 		})
 
 		Context("ListImages() returns an error", func() {
