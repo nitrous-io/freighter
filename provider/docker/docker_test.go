@@ -831,7 +831,8 @@ var _ = Describe("provider/docker", func() {
 		}
 
 		It("should fetch the basic info about an Image", func() {
-			imageList, _ := prov.ListImages(false)
+			imageList, err := prov.ListImages(false)
+			Expect(err).To(BeNil())
 
 			splitSet := strings.Split(image, ":")
 			Expect(splitSet).To(HaveLen(2))
