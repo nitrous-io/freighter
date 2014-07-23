@@ -388,22 +388,22 @@ func (p *DockerProvider) Export(id string, output io.Writer) error {
 }
 
 func (p *DockerProvider) ListImages(showAll bool) ([]*provider.ImageInfo, error) {
-	apiimages, err := p.client.ListImages(showAll)
+	dockerImages, err := p.client.ListImages(showAll)
 	if err != nil {
 		return nil, err
 	}
 
 	list := []*provider.ImageInfo{}
-	for _, apiimage := range apiimages {
-		for _, name := range apiimage.RepoTags {
+	for _, dockerImage := range dockerImages {
+		for _, name := range dockerImage.RepoTags {
 			repoSplit := strings.SplitN(name, ":", 2)
 			info := &provider.ImageInfo{
-				ID:          apiimage.ID,
-				ParentID:    apiimage.ParentId,
+				ID:          dockerImage.ID,
+				ParentID:    dockerImage.ParentId,
 				Source:      repoSplit[0],
-				CreatedAt:   apiimage.Created,
-				ActualSize:  apiimage.Size,
-				VirtualSize: apiimage.VirtualSize,
+				CreatedAt:   dockerImage.Created,
+				ActualSize:  dockerImage.Size,
+				VirtualSize: dockerImage.VirtualSize,
 			}
 			if len(repoSplit) > 1 {
 				info.SourceTag = repoSplit[1]
