@@ -1119,8 +1119,6 @@ var _ = Describe("client", func() {
 		setupServer := func(method, url, query string) {
 			handlers = ghttp.CombineHandlers(
 				func(w http.ResponseWriter, req *http.Request) {
-					// Call ParseForm() so that server.ReceivedRequests() have
-					// POST params populated.
 					err := req.ParseForm()
 					Expect(err).To(BeNil())
 				},
@@ -1129,12 +1127,8 @@ var _ = Describe("client", func() {
 				ghttp.RespondWithPtr(&statusCode, &responseBody),
 			)
 
-			server = ghttp.NewServer()
-			server.AppendHandlers(handlers)
-
-			ip, port := IPAndPort(server)
-			host = &freighterclient.Host{Host: ip, Port: port, Secure: false}
-			client = freighterclient.NewClient(nil)
+			st = NewServerTest(handlers)
+			client, host, server = st.client, st.host, st.server
 		}
 
 		teardownServer := func() {
