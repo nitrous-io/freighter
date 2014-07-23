@@ -1183,7 +1183,7 @@ var _ = Describe("client", func() {
 
 			})
 
-			Context("with connect failures", func() {
+			Context("with failures communicating with endpoint", func() {
 
 				BeforeEach(func() {
 					setupServer("GET", "/images", "show_all=true")
@@ -1204,7 +1204,7 @@ var _ = Describe("client", func() {
 					Expect(images).To(BeNil())
 				})
 
-				It("should surface respone failures in StatusErr", func() {
+				It("should surface response failures in StatusErr", func() {
 					statusCode = http.StatusInternalServerError
 					images, err := client.ListImages(host, true)
 
