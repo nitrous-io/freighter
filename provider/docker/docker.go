@@ -462,12 +462,18 @@ func (p *DockerProvider) RemoveImage(imageIdOrName string) error {
 	}
 
 	if useID {
-		return p.client.RemoveImage(matchingImage.ID)
+		err = p.client.RemoveImage(matchingImage.ID)
 	} else {
 		merged := strings.Join([]string{matchingImage.Name, matchingImage.Tag}, ":")
 		fullName := strings.Join([]string{p.namespace, merged}, "")
-		return p.client.RemoveImage(fullName)
+		err = p.client.RemoveImage(fullName)
 	}
+
+	if err != nil && strings.Contains(err.Error(), "tagged in multiple repositories") {
+		return provider.ErrImageShared
+	}
+
+	return err
 }
 
 func (p *DockerProvider) createContainer(imageName, containerName string, config *allowedConfig, hostConfig *allowedHostConfig) (*dockerclient.Container, error) {

@@ -12,6 +12,7 @@ var (
 	ErrTimeout               = errors.New("Operation timed out")
 	ErrPubKeyOpsNotSupported = errors.New("Public key operations are not supported on this container")
 	ErrImageNotFound         = errors.New("Image does not exist")
+	ErrImageShared           = errors.New("Image is shared across multiple tags")
 )
 
 type Provider interface {

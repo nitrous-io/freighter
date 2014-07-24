@@ -76,7 +76,7 @@ var _ = Describe("provider/docker", func() {
 		return doInspect(id, "{{.NetworkSettings.IPAddress}}")
 	}
 
-	createImages := func(count int, name string, hidden, noFindable bool) []string {
+	createImages := func(count int, name string, hidden, noFindable, noEntropy bool) []string {
 		dockerSource := `
 			FROM %s
 			MAINTAINER Nitrous.IO, hello@nitrous.io
@@ -85,7 +85,13 @@ var _ = Describe("provider/docker", func() {
 
 			CMD /bin/bash
 			`
-		interpolated := fmt.Sprintf(dockerSource, image, name)
+		var entropy string
+		if !noEntropy {
+			entropy = name
+		} else {
+			entropy = "thing"
+		}
+		interpolated := fmt.Sprintf(dockerSource, image, entropy)
 		dockerLoc, err := ioutil.TempDir("", "DockerTest")
 		Expect(err).To(BeNil())
 		fileLoc := filepath.Join(dockerLoc, "Dockerfile")
@@ -862,7 +868,7 @@ var _ = Describe("provider/docker", func() {
 			)
 
 			BeforeEach(func() {
-				createdImages = createImages(1, "basic", true, false)
+				createdImages = createImages(1, "basic", true, false, false)
 			})
 
 			AfterEach(func() {
@@ -910,7 +916,7 @@ var _ = Describe("provider/docker", func() {
 			)
 
 			BeforeEach(func() {
-				createdImages = createImages(2, "multiple", true, false)
+				createdImages = createImages(2, "multiple", true, false, false)
 			})
 
 			AfterEach(func() {
@@ -1041,8 +1047,8 @@ var _ = Describe("provider/docker", func() {
 		)
 
 		BeforeEach(func() {
-			publicImages = createImages(1, "removeable", false, false)
-			nonPublicImages = createImages(1, "nonremoveable", true, true)
+			publicImages = createImages(1, "removeable", false, false, false)
+			nonPublicImages = createImages(1, "nonremoveable", true, true, false)
 		})
 
 		AfterEach(func() {
@@ -1072,6 +1078,31 @@ var _ = Describe("provider/docker", func() {
 
 					out, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
 					Expect(out).To(ContainSubstring("Error: No such image or container:"))
+				})
+
+				Context("with multiple images under ID", func() {
+					var (
+						multipleImages []string
+					)
+
+					BeforeEach(func() {
+						multipleImages = createImages(1, "multremoveable", false, false, true)
+						multipleImages = append(multipleImages, createImages(1, "multremoveable2", false, false, true)...)
+					})
+
+					AfterEach(func() {
+						removeCreated(multipleImages)
+					})
+
+					It("should not allow for deletion", func() {
+						id := doInspect(multipleImages[0], "{{.Id}}")
+						Expect(id).ToNot(HaveLen(0))
+						err := prov.RemoveImage(id)
+						Expect(err).To(Equal(provider.ErrImageShared))
+
+						id = doInspect(multipleImages[0], "{{.Id}}")
+						Expect(id).ToNot(HaveLen(0))
+					})
 				})
 			})
 		})
