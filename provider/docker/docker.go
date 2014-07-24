@@ -448,11 +448,11 @@ func (p *DockerProvider) RemoveImage(imageIdOrName string) error {
 			// break up parts, only when we truly need to
 			if len(repository) == 0 {
 				repository, tag = extractRepoAndTag(imageIdOrName)
-			} else {
-				if repository == image.Name && tag == image.Tag {
-					matchingImage = image
-					break
-				}
+			}
+
+			if repository == image.Name && tag == image.Tag {
+				matchingImage = image
+				break
 			}
 		}
 	}
