@@ -431,20 +431,52 @@ func (p *DockerProvider) BuildImage(name string, incoming io.Reader) error {
 	return p.client.BuildImage(buildOptions)
 }
 
+func (p *DockerProvider) RemoveImage(imageIdOrName string) error {
+	// look up the image to test its validity
+	availableImages, err := p.ListImages()
+	if err != nil {
+		return err
+	}
+
+	useID := false
+	var matchingImage *provider.ImageInfo
+	var repository, tag string
+	for _, image := range availableImages {
+		if image.ID == imageIdOrName {
+			matchingImage = image
+			useID = true
+			break
+		} else {
+			// break up parts, only when we truly need to
+			if len(repository) == 0 {
+				repository, tag = extractRepoAndTag(imageIdOrName)
+			} else {
+				if repository == image.Name && tag == image.Tag {
+					matchingImage = image
+					break
+				}
+			}
+		}
+	}
+
+	if matchingImage == nil {
+		return provider.ErrImageNotFound
+	}
+
+	if useID {
+		return p.client.RemoveImage(matchingImage.ID)
+	} else {
+		merged := strings.Join([]string{matchingImage.Name, matchingImage.Tag}, ":")
+		fullName := strings.Join([]string{p.namespace, merged}, "")
+		return p.client.RemoveImage(fullName)
+	}
+}
+
 func (p *DockerProvider) createContainer(imageName, containerName string, config *allowedConfig, hostConfig *allowedHostConfig) (*dockerclient.Container, error) {
 	p.logger.Info("DockerProvider: creating container", containerName, "with image", imageName)
 	start := time.Now()
 
-	parts := strings.Split(imageName, ":")
-	var repository, tag string
-	repository = parts[0]
-
-	if len(parts) == 1 {
-		tag = "latest"
-	} else {
-		tag = parts[1]
-	}
-
+	repository, tag := extractRepoAndTag(imageName)
 	err := p.client.PullImage(dockerclient.PullImageOptions{
 		Repository: repository,
 		Tag:        tag,
@@ -493,6 +525,20 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 
 	p.logger.TimeInfo(start, "DockerProvider: started container", containerName, id, "in")
 	return container, err
+}
+
+func extractRepoAndTag(imageName string) (string, string) {
+	parts := strings.Split(imageName, ":")
+	var repository, tag string
+	repository = parts[0]
+
+	if len(parts) == 1 {
+		tag = "latest"
+	} else {
+		tag = parts[1]
+	}
+
+	return repository, tag
 }
 
 func (p *DockerProvider) containerSettingsDir(containerName string) string {

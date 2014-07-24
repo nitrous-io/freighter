@@ -11,6 +11,7 @@ var containerNameRe = regexp.MustCompile(`\A[a-z][a-z0-9\-]*[a-z0-9]\z`)
 var (
 	ErrTimeout               = errors.New("Operation timed out")
 	ErrPubKeyOpsNotSupported = errors.New("Public key operations are not supported on this container")
+	ErrImageNotFound         = errors.New("Image does not exist")
 )
 
 type Provider interface {
@@ -37,6 +38,7 @@ type Provider interface {
 
 	ListImages() (infoList []*ImageInfo, err error)
 	BuildImage(name string, incoming io.Reader, result io.Writer) error
+	RemoveImage(imageIdOrName string) error
 }
 
 type ContainerInfo struct {

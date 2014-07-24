@@ -76,6 +76,53 @@ var _ = Describe("provider/docker", func() {
 		return doInspect(id, "{{.NetworkSettings.IPAddress}}")
 	}
 
+	createImages := func(count int, name string, hidden, noFindable bool) []string {
+		dockerSource := `
+			FROM %s
+			MAINTAINER Nitrous.IO, hello@nitrous.io
+
+			RUN echo '%s' >> /tmp/info
+
+			CMD /bin/bash
+			`
+		interpolated := fmt.Sprintf(dockerSource, image, name)
+		dockerLoc, err := ioutil.TempDir("", "DockerTest")
+		Expect(err).To(BeNil())
+		fileLoc := filepath.Join(dockerLoc, "Dockerfile")
+		dockerFile, err := os.Create(fileLoc)
+		Expect(err).To(BeNil())
+		dockerFile.WriteString(interpolated)
+		dockerFile.Close()
+
+		list := []string{}
+		for index := 1; index <= count; index++ {
+			if !noFindable {
+				findableName := fmt.Sprintf("%v.%v:n%v", namespace, name, index)
+				exec.Command("docker", "build", "-t", findableName, dockerLoc).Run()
+				list = append(list, findableName)
+			}
+
+			if hidden {
+				hiddenName := fmt.Sprintf("%vprivate.bad%v:n%v", namespace, name, index)
+				exec.Command("docker", "build", "-t", hiddenName, dockerLoc).Run()
+				list = append(list, hiddenName)
+			}
+		}
+
+		err = os.Remove(fileLoc)
+		Expect(err).To(BeNil())
+		err = os.Remove(dockerLoc)
+		Expect(err).To(BeNil())
+
+		return list
+	}
+
+	removeCreated := func(names []string) {
+		for _, name := range names {
+			exec.Command("docker", "rmi", name).Run()
+		}
+	}
+
 	Describe(".Create()", func() {
 		var (
 			name         string
@@ -809,55 +856,13 @@ var _ = Describe("provider/docker", func() {
 			return parsedSize
 		}
 
-		createImages := func(count int, name string) []string {
-			dockerSource := `
-			FROM %s
-			MAINTAINER Nitrous.IO, hello@nitrous.io
-
-			CMD /bin/bash
-			`
-			interpolated := fmt.Sprintf(dockerSource, image)
-			dockerLoc, err := ioutil.TempDir("", "DockerTest")
-			Expect(err).To(BeNil())
-			fileLoc := filepath.Join(dockerLoc, "Dockerfile")
-			dockerFile, err := os.Create(fileLoc)
-			Expect(err).To(BeNil())
-			dockerFile.WriteString(interpolated)
-			dockerFile.Close()
-
-			list := []string{}
-			for index := 1; index <= count; index++ {
-				findableName := fmt.Sprintf("%v.%v:n%v", namespace, name, index)
-				hiddenName := fmt.Sprintf("%vprivate.bad%v:n%v", namespace, name, index)
-
-				exec.Command("docker", "build", "-t", findableName, dockerLoc).Run()
-				exec.Command("docker", "build", "-t", hiddenName, dockerLoc).Run()
-
-				list = append(list, findableName)
-				list = append(list, hiddenName)
-			}
-
-			err = os.Remove(fileLoc)
-			Expect(err).To(BeNil())
-			err = os.Remove(dockerLoc)
-			Expect(err).To(BeNil())
-
-			return list
-		}
-
-		removeCreated := func(names []string) {
-			for _, name := range names {
-				exec.Command("docker", "rmi", name).Run()
-			}
-		}
-
 		Context("with one image", func() {
 			var (
 				createdImages []string
 			)
 
 			BeforeEach(func() {
-				createdImages = createImages(1, "basic")
+				createdImages = createImages(1, "basic", true, false)
 			})
 
 			AfterEach(func() {
@@ -905,7 +910,7 @@ var _ = Describe("provider/docker", func() {
 			)
 
 			BeforeEach(func() {
-				createdImages = createImages(2, "multiple")
+				createdImages = createImages(2, "multiple", true, false)
 			})
 
 			AfterEach(func() {
@@ -943,7 +948,7 @@ var _ = Describe("provider/docker", func() {
 
 	})
 
-	FDescribe(".BuildImage()", func() {
+	Describe(".BuildImage()", func() {
 
 		createImageTarball := func() io.Reader {
 			buf := new(bytes.Buffer)
@@ -1020,6 +1025,73 @@ var _ = Describe("provider/docker", func() {
 			Expect(string(res)).To(Equal("Hello from Docker!"))
 
 			exec.Command("docker", "rmi", strings.Join([]string{namespace, "myimage:latest"}, ".")).Run()
+		})
+
+	})
+
+	Describe(".RemoveImage()", func() {
+
+		var (
+			publicImages    []string
+			nonPublicImages []string
+		)
+
+		BeforeEach(func() {
+			publicImages = createImages(1, "removeable", false, false)
+			nonPublicImages = createImages(1, "nonremoveable", true, true)
+		})
+
+		AfterEach(func() {
+			/*removeCreated(publicImages)
+			removeCreated(nonPublicImages)*/
+		})
+
+		Context("when an ID is provided", func() {
+			Context("when the image is not owned the namespace", func() {
+				It("should return an error not locating image", func() {
+					id := doInspect(nonPublicImages[0], "{{.Id}}")
+					Expect(id).ToNot(HaveLen(0))
+					err := prov.RemoveImage(id)
+					Expect(err).To(Equal(provider.ErrImageNotFound))
+
+					id = doInspect(publicImages[0], "{{.Id}}")
+					Expect(id).ToNot(HaveLen(0))
+				})
+			})
+
+			Context("when the image is owned by the namespace", func() {
+				It("should be deleted", func() {
+					id := doInspect(publicImages[0], "{{.Id}}")
+					Expect(id).ToNot(HaveLen(0))
+					err := prov.RemoveImage(id)
+					Expect(err).To(BeNil())
+
+					id = doInspect(publicImages[0], "{{.Id}}")
+					Expect(id).To(HaveLen(0))
+				})
+			})
+		})
+
+		FContext("when a Name is provided", func() {
+			Context("when the image is not owned the namespace", func() {
+				It("should return an error not locating image", func() {
+					err := prov.RemoveImage(nonPublicImages[0])
+					Expect(err).To(Equal(provider.ErrImageNotFound))
+
+					id := doInspect(nonPublicImages[0], "{{.Id}}")
+					Expect(id).ToNot(HaveLen(0))
+				})
+			})
+
+			Context("when the image is owned by the namespace", func() {
+				It("should be deleted", func() {
+					err := prov.RemoveImage(publicImages[0])
+					Expect(err).To(BeNil())
+
+					id := doInspect(publicImages[0], "{{.Id}}")
+					Expect(id).To(HaveLen(0))
+				})
+			})
 		})
 
 	})
