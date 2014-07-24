@@ -997,15 +997,19 @@ var _ = Describe("provider/docker", func() {
 
 		It("creates an Image successfully", func() {
 			readBuf := createImageTarball()
-			err := prov.BuildImage("myimage", readBuf)
+			outputBuffer := new(bytes.Buffer)
+			err := prov.BuildImage("myimage", readBuf, outputBuffer)
 			Expect(err).To(BeNil())
+
+			Expect(outputBuffer.String()).To(ContainSubstring("Successfully built"))
 
 			exec.Command("docker", "rmi", strings.Join([]string{namespace, "myimage:latest"}, ".")).Run()
 		})
 
 		It("correctly stores the additional data", func() {
 			readBuf := createImageTarball()
-			err := prov.BuildImage("myimage", readBuf)
+			outputBuffer := new(bytes.Buffer)
+			err := prov.BuildImage("myimage", readBuf, outputBuffer)
 			Expect(err).To(BeNil())
 
 			allImages, err := prov.ListImages()

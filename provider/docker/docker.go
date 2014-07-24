@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -418,14 +417,13 @@ func (p *DockerProvider) ListImages() ([]*provider.ImageInfo, error) {
 	return list, nil
 }
 
-func (p *DockerProvider) BuildImage(name string, incoming io.Reader) error {
+func (p *DockerProvider) BuildImage(name string, incoming io.Reader, result io.Writer) error {
 	prefixedName := strings.Join([]string{p.namespace, name}, "")
 
-	outputBuffer := new(bytes.Buffer)
 	buildOptions := dockerclient.BuildImageOptions{
 		Name:         prefixedName,
 		InputStream:  incoming,
-		OutputStream: outputBuffer,
+		OutputStream: result,
 	}
 
 	return p.client.BuildImage(buildOptions)
