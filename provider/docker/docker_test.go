@@ -1076,7 +1076,7 @@ var _ = Describe("provider/docker", func() {
 					err := prov.RemoveImage(id)
 					Expect(err).To(BeNil())
 
-					out, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
+					out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
 					Expect(out).To(ContainSubstring("Error: No such image or container:"))
 				})
 
@@ -1124,10 +1124,61 @@ var _ = Describe("provider/docker", func() {
 					err := prov.RemoveImage(withoutNamespace)
 					Expect(err).To(BeNil())
 
-					out, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
+					out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
 					Expect(out).To(ContainSubstring("Error: No such image or container:"))
 				})
 			})
+		})
+
+	})
+
+	FDescribe(".PullImage()", func() {
+
+		checkImageRenamed := func(name string) {
+			out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", name).CombinedOutput()
+			Expect(out).To(ContainSubstring("Error: No such image or container:"))
+
+			parts := strings.Split(name, ":")
+			Expect(parts).To(HaveLen(2))
+			repo, tag := parts[0], parts[1]
+
+			knownImages, err := prov.ListImages()
+			Expect(err).To(BeNil())
+			var targetImage *provider.ImageInfo
+			for _, image := range knownImages {
+				if image.Name == repo && image.Tag == tag {
+					targetImage = image
+					break
+				}
+			}
+
+			Expect(targetImage).ToNot(BeNil())
+			err = prov.RemoveImage(name)
+			Expect(err).To(BeNil())
+		}
+
+		It("should allow for importing by just a repository", func() {
+			err := prov.PullImage("ubuntu")
+			Expect(err).To(BeNil())
+			checkImageRenamed("ubuntu:latest")
+		})
+
+		It("should allow for importing by a tagged image", func() {
+			err := prov.PullImage("ubuntu:10.04")
+			Expect(err).To(BeNil())
+			checkImageRenamed("ubuntu:10.04")
+		})
+
+		It("should allow for importing by default hub", func() {
+			err := prov.PullImage("nitrousio/nodejs")
+			Expect(err).To(BeNil())
+			checkImageRenamed("nitrousio/nodejs:latest")
+		})
+
+		It("should allow for importing by remote registry", func() {
+			err := prov.PullImage("quay.io/quay/ubuntu")
+			Expect(err).To(BeNil())
+			checkImageRenamed("quay.io/quay/ubuntu:latest")
 		})
 
 	})

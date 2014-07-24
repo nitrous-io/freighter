@@ -40,6 +40,7 @@ type Provider interface {
 	ListImages() (infoList []*ImageInfo, err error)
 	BuildImage(name string, incoming io.Reader, result io.Writer) error
 	RemoveImage(imageIdOrName string) error
+	PullImage(location string, result io.Writer) error
 }
 
 type ContainerInfo struct {

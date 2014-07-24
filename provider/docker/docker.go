@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -474,6 +475,41 @@ func (p *DockerProvider) RemoveImage(imageIdOrName string) error {
 	}
 
 	return err
+}
+
+func (p *DockerProvider) PullImage(location string) error {
+	outputBuffer := new(bytes.Buffer)
+	repository, tag := extractRepoAndTag(location)
+	pullOpts := dockerclient.PullImageOptions{
+		Repository:   repository,
+		Tag:          tag,
+		OutputStream: outputBuffer,
+	}
+
+	err := p.client.PullImage(pullOpts, dockerclient.AuthConfiguration{})
+
+	if err != nil {
+		return err
+	}
+
+	newRepo := strings.Join([]string{p.namespace, repository}, "")
+	existingName := strings.Join([]string{repository, tag}, ":")
+	newName := strings.Join([]string{newRepo, tag}, ":")
+
+	// current version of the docker client only accepts "repo"
+	// causing the tag be part of the repo name, the docker CLI performs the correct action
+	args := []string{
+		"tag",
+		existingName,
+		newName,
+	}
+	err = exec.Command("docker", args...).Run()
+
+	if err != nil {
+		return err
+	}
+
+	return p.client.RemoveImage(existingName)
 }
 
 func (p *DockerProvider) createContainer(imageName, containerName string, config *allowedConfig, hostConfig *allowedHostConfig) (*dockerclient.Container, error) {
