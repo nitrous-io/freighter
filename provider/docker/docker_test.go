@@ -1,7 +1,11 @@
 package docker_test
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -935,6 +939,87 @@ var _ = Describe("provider/docker", func() {
 				Expect(target2).ToNot(BeNil())
 				Expect(target2.ID).To(Equal(target1.ID))
 			})
+		})
+
+	})
+
+	FDescribe(".BuildImage()", func() {
+
+		createImageTarball := func() io.Reader {
+			buf := new(bytes.Buffer)
+			gzipWriter := gzip.NewWriter(buf)
+			tarWriter := tar.NewWriter(gzipWriter)
+
+			dockerSource := `
+			FROM %s
+			MAINTAINER Nitrous.IO, hello@nitrous.io
+
+			ADD some_file.txt /some/file.txt
+
+			CMD /bin/bash -c 'cat /some/file.txt'
+			`
+			formattedDockerSource := fmt.Sprintf(dockerSource, image)
+
+			dockerSourceHeader := &tar.Header{
+				Name: "Dockerfile",
+				Size: int64(len(formattedDockerSource)),
+			}
+			err := tarWriter.WriteHeader(dockerSourceHeader)
+			Expect(err).To(BeNil())
+			written, err := tarWriter.Write([]byte(formattedDockerSource))
+			Expect(err).To(BeNil())
+			Expect(written).ToNot(Equal(0))
+
+			someFile := "Hello from Docker!"
+			someFileHeader := &tar.Header{
+				Name: "some_file.txt",
+				Size: int64(len(someFile)),
+			}
+			err = tarWriter.WriteHeader(someFileHeader)
+			Expect(err).To(BeNil())
+			Expect(written).ToNot(Equal(0))
+			written, err = tarWriter.Write([]byte(someFile))
+			Expect(err).To(BeNil())
+			Expect(written).ToNot(Equal(0))
+
+			err = tarWriter.Close()
+			Expect(err).To(BeNil())
+			err = gzipWriter.Close()
+			Expect(err).To(BeNil())
+
+			return buf
+		}
+
+		It("creates an Image successfully", func() {
+			readBuf := createImageTarball()
+			err := prov.BuildImage("myimage", readBuf)
+			Expect(err).To(BeNil())
+
+			exec.Command("docker", "rmi", strings.Join([]string{namespace, "myimage:latest"}, ".")).Run()
+		})
+
+		It("correctly stores the additional data", func() {
+			readBuf := createImageTarball()
+			err := prov.BuildImage("myimage", readBuf)
+			Expect(err).To(BeNil())
+
+			allImages, err := prov.ListImages()
+			Expect(err).To(BeNil())
+
+			var matchingImage *provider.ImageInfo
+			for _, image := range allImages {
+				if image.Name == "myimage" && image.Tag == "latest" {
+					matchingImage = image
+				}
+			}
+
+			Expect(matchingImage).ToNot(BeNil())
+
+			res, err := exec.Command("docker", "run", "--rm=true", matchingImage.ID).Output()
+			Expect(err).To(BeNil())
+			Expect(string(res)).To(Equal("Hello from Docker!"))
+
+			exec.Command("docker", "rmi", strings.Join([]string{namespace, "myimage:latest"}, ".")).Run()
 		})
 
 	})

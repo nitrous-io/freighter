@@ -36,6 +36,7 @@ type Provider interface {
 	Logout(registry string) error
 
 	ListImages() (infoList []*ImageInfo, err error)
+	BuildImage(name string, incoming io.Reader, result io.Writer) error
 }
 
 type ContainerInfo struct {
