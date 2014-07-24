@@ -1046,8 +1046,8 @@ var _ = Describe("provider/docker", func() {
 		})
 
 		AfterEach(func() {
-			/*removeCreated(publicImages)
-			removeCreated(nonPublicImages)*/
+			removeCreated(publicImages)
+			removeCreated(nonPublicImages)
 		})
 
 		Context("when an ID is provided", func() {
@@ -1070,13 +1070,13 @@ var _ = Describe("provider/docker", func() {
 					err := prov.RemoveImage(id)
 					Expect(err).To(BeNil())
 
-					id = doInspect(publicImages[0], "{{.Id}}")
-					Expect(id).To(HaveLen(0))
+					out, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
+					Expect(out).To(ContainSubstring("Error: No such image or container:"))
 				})
 			})
 		})
 
-		FContext("when a Name is provided", func() {
+		Context("when a Name is provided", func() {
 			Context("when the image is not owned the namespace", func() {
 				It("should return an error not locating image", func() {
 					err := prov.RemoveImage(nonPublicImages[0])
@@ -1089,11 +1089,12 @@ var _ = Describe("provider/docker", func() {
 
 			Context("when the image is owned by the namespace", func() {
 				It("should be deleted", func() {
-					err := prov.RemoveImage(publicImages[0])
+					withoutNamespace := strings.TrimPrefix(publicImages[0], strings.Join([]string{namespace, "."}, ""))
+					err := prov.RemoveImage(withoutNamespace)
 					Expect(err).To(BeNil())
 
-					id := doInspect(publicImages[0], "{{.Id}}")
-					Expect(id).To(HaveLen(0))
+					out, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
+					Expect(out).To(ContainSubstring("Error: No such image or container:"))
 				})
 			})
 		})
