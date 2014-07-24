@@ -1185,4 +1185,94 @@ var _ = Describe("provider/docker", func() {
 		})
 
 	})
+
+	FDescribe(".TagImage()", func() {
+
+		verifyImageExistence := func(name string) {
+			parts := strings.Split(name, ":")
+			Expect(parts).To(HaveLen(2))
+			repo, tag := parts[0], parts[1]
+
+			knownImages, err := prov.ListImages()
+			Expect(err).To(BeNil())
+			var targetImage *provider.ImageInfo
+			for _, image := range knownImages {
+
+				if image.Name == repo && image.Tag == tag {
+					targetImage = image
+					break
+				}
+			}
+
+			Expect(targetImage).ToNot(BeNil())
+			err = prov.RemoveImage(name)
+			Expect(err).To(BeNil())
+		}
+
+		It("should not allow for tagging images outside of the namespace", func() {
+			created := createImages(1, "namely", true, false, false)
+			err := prov.TagImage(created[0], "namely2", false)
+			Expect(err).To(Equal(provider.ErrImageNotFound))
+
+			removeCreated(created)
+		})
+
+		It("should not allow for tagging images outside of the namespace with an ID", func() {
+			created := createImages(1, "idly", true, true, false)
+			id := doInspect(created[0], "{{.Id}}")
+			err := prov.TagImage(id, "idly2", false)
+			Expect(err).To(Equal(provider.ErrImageNotFound))
+
+			removeCreated(created)
+		})
+
+		It("should allow for tagging images without tags", func() {
+			created := createImages(1, "withoutly", false, false, false)
+			err := prov.TagImage(withoutNamespace(created[0]), "withoutly2", false)
+			Expect(err).To(BeNil())
+
+			verifyImageExistence("withoutly2:latest")
+			removeCreated(created)
+		})
+
+		It("should allow for tagging images with tags", func() {
+			created := createImages(1, "tagly", false, false, false)
+			err := prov.TagImage(withoutNamespace(created[0]), "tagly2:1907", false)
+			Expect(err).To(BeNil())
+
+			verifyImageExistence("tagly2:1907")
+			removeCreated(created)
+		})
+
+		It("should allow for referencing an image by its ID", func() {
+
+		})
+
+		Context("image tag already exists", func() {
+
+			It("should not override existing tags with no force", func() {
+				created := createImages(1, "nooverridely", false, false, false)
+				err := prov.TagImage(withoutNamespace(created[0]), "nooverridely:n1", false)
+				Expect(err).To(Equal(provider.ErrImageTagExists))
+
+				removeCreated(created)
+			})
+
+			It("should override existing tags with force", func() {
+				target := createImages(1, "overridely", false, false, false)
+				destination := createImages(1, "overridelyreplacey", false, false, false)
+				curId := doInspect(destination[0], "{{.Id}}")
+
+				err := prov.TagImage(withoutNamespace(target[0]), "overridelyreplacey:n1", true)
+				Expect(err).To(BeNil())
+
+				newId := getID("overridelyreplacey:n1")
+				Expect(newId).ToNot(Equal(curId))
+				removeCreated(target)
+				removeCreated(destination)
+			})
+
+		})
+
+	})
 })

@@ -43,6 +43,11 @@ type DockerProvider struct {
 	logger    *util.Logger
 }
 
+type lookupImageResult struct {
+	MatchingImage provider.ImageInfo
+	FoundByID     bool
+}
+
 func NewDockerProvider(logger *util.Logger, dataPath string, namespace string) (*DockerProvider, error) {
 	if logger == nil || dataPath == "" || namespace == "" {
 		return nil, errors.New("docker.NewDockerProvider: invalid argument")
@@ -431,36 +436,12 @@ func (p *DockerProvider) BuildImage(name string, incoming io.Reader, result io.W
 }
 
 func (p *DockerProvider) RemoveImage(imageIdOrName string) error {
-	// look up the image to test its validity
-	availableImages, err := p.ListImages()
+	lookupResult, err := p.lookupImage(imageIdOrName)
 	if err != nil {
 		return err
 	}
 
-	useID := false
-	var matchingImage *provider.ImageInfo
-	var repository, tag string
-	for _, image := range availableImages {
-		if image.ID == imageIdOrName {
-			matchingImage = image
-			useID = true
-			break
-		} else {
-			// break up parts, only when we truly need to
-			if len(repository) == 0 {
-				repository, tag = extractRepoAndTag(imageIdOrName)
-			}
-
-			if repository == image.Name && tag == image.Tag {
-				matchingImage = image
-				break
-			}
-		}
-	}
-
-	if matchingImage == nil {
-		return provider.ErrImageNotFound
-	}
+	matchingImage, useID := lookupResult.MatchingImage, lookupResult.FoundByID
 
 	if useID {
 		err = p.client.RemoveImage(matchingImage.ID)
@@ -510,6 +491,67 @@ func (p *DockerProvider) PullImage(location string) error {
 	}
 
 	return p.client.RemoveImage(existingName)
+}
+
+func (p *DockerProvider) TagImage(imageIdOrName, newName string, force bool) error {
+	lookupResult, err := p.lookupImage(imageIdOrName)
+	if err != nil {
+		return err
+	}
+
+	matchingImage := lookupResult.MatchingImage
+
+	repository, tag := extractRepoAndTag(newName)
+	newRepo := strings.Join([]string{p.namespace, repository}, "")
+	finalName := strings.Join([]string{newRepo, tag}, ":")
+
+	if !force {
+		// check for collision
+		_, err := p.client.InspectImage(finalName)
+		if err != dockerclient.ErrNoSuchImage {
+			return provider.ErrImageTagExists
+		}
+	}
+
+	args := []string{
+		"tag",
+		"-f",
+		matchingImage.ID,
+		finalName,
+	}
+	err = exec.Command("docker", args...).Run()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *DockerProvider) lookupImage(imageIdOrName string) (lookupImageResult, error) {
+	// look up the image to test its validity
+	availableImages, err := p.ListImages()
+	if err != nil {
+		return lookupImageResult{}, err
+	}
+
+	var repository, tag string
+	for _, image := range availableImages {
+		if image.ID == imageIdOrName {
+			return lookupImageResult{MatchingImage: *image, FoundByID: true}, nil
+		} else {
+			// break up parts, only when we truly need to
+			if len(repository) == 0 {
+				repository, tag = extractRepoAndTag(imageIdOrName)
+			}
+
+			if repository == image.Name && tag == image.Tag {
+				return lookupImageResult{MatchingImage: *image}, nil
+			}
+		}
+	}
+
+	return lookupImageResult{}, provider.ErrImageNotFound
 }
 
 func (p *DockerProvider) createContainer(imageName, containerName string, config *allowedConfig, hostConfig *allowedHostConfig) (*dockerclient.Container, error) {

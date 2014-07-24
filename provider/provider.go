@@ -13,6 +13,7 @@ var (
 	ErrPubKeyOpsNotSupported = errors.New("Public key operations are not supported on this container")
 	ErrImageNotFound         = errors.New("Image does not exist")
 	ErrImageShared           = errors.New("Image is shared across multiple tags")
+	ErrImageTagExists        = errors.New("Image with same tag already exists")
 )
 
 type Provider interface {
@@ -41,6 +42,7 @@ type Provider interface {
 	BuildImage(name string, incoming io.Reader, result io.Writer) error
 	RemoveImage(imageIdOrName string) error
 	PullImage(location string, result io.Writer) error
+	TagImage(imageIdOrName, newName string) error
 }
 
 type ContainerInfo struct {
