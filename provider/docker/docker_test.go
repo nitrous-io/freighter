@@ -1136,7 +1136,17 @@ var _ = Describe("provider/docker", func() {
 
 	})
 
-	Describe(".PullImage()", func() {
+	FDescribe(".PullImage()", func() {
+
+		var (
+			mockProxy    *MockDockerProxy
+			tempAuthFile *os.File
+		)
+
+		createBasicImage := func(name string) {
+			err := exec.Command("docker", "tag", "-f", image, name).Run()
+			Expect(err).To(BeNil())
+		}
 
 		checkImageRenamed := func(name string) {
 			out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", name).CombinedOutput()
@@ -1161,28 +1171,138 @@ var _ = Describe("provider/docker", func() {
 			Expect(err).To(BeNil())
 		}
 
-		It("should allow for importing by just a repository", func() {
-			err := prov.PullImage("ubuntu")
+		BeforeEach(func() {
+			var err error
+
+			mockProxy = &MockDockerProxy{}
+			tempAuthFile, err = ioutil.TempFile("", "cfg")
 			Expect(err).To(BeNil())
-			checkImageRenamed("ubuntu:latest")
+
+			/* credientials are
+			test:1234xxcc
+			testo:Password1
+			magic:abc34x1
+			*/
+			authFileSrc := `
+				{
+				  "https://index.docker.io/v1/": {
+				    "auth": "dGVzdDoxMjM0eHhjYwo=",
+				    "email": "docker@callumj.com"
+				  },
+				  "quay.io": {
+				    "auth": "dGVzdG86UGFzc3dvcmQxCg==",
+				    "email": "quay@callumj.com"
+				  },
+				  "cloud.inc": {
+				    "auth": "bWFnaWM6YWJjMzR4MQo=",
+				    "email": "cloud@callumj.com"
+				  },
+				  "magic.io": {}
+				}
+				`
+
+			_, err = tempAuthFile.WriteString(authFileSrc)
+			Expect(err).To(BeNil())
+			err = tempAuthFile.Sync()
+			Expect(err).To(BeNil())
+
+			prov.DockerClientProxy = mockProxy
+			prov.DockerConfigLocation = tempAuthFile.Name()
 		})
 
-		It("should allow for importing by a tagged image", func() {
-			err := prov.PullImage("ubuntu:10.04")
-			Expect(err).To(BeNil())
-			checkImageRenamed("ubuntu:10.04")
+		AfterEach(func() {
+			tempAuthFile.Close()
+		})
+
+		It("should handle if auth credentials could not be located", func() {
+			err := prov.PullImage("cloudy.io/nodejs")
+			Expect(err).To(Equal(provider.ErrImageAuthNotAllowed))
+
+			Expect(mockProxy.PullImageCalled).To(BeFalse())
 		})
 
 		It("should allow for importing by default hub", func() {
+			mockProxy.PullImageCallBack = func() {
+				createBasicImage("nitrousio/nodejs")
+			}
 			err := prov.PullImage("nitrousio/nodejs")
 			Expect(err).To(BeNil())
+
+			Expect(mockProxy.PullImageCalled).To(BeTrue())
+			Expect(mockProxy.PullImageOpts.Repository).To(Equal("nitrousio/nodejs"))
+			Expect(mockProxy.PullImageOpts.Tag).To(HaveLen(0))
+			Expect(mockProxy.PullImageAuth.Username).To(Equal("test"))
+			Expect(mockProxy.PullImageAuth.Password).To(ContainSubstring("1234xxcc"))
+			Expect(mockProxy.PullImageAuth.Email).To(Equal("docker@callumj.com"))
+
 			checkImageRenamed("nitrousio/nodejs:latest")
 		})
 
+		It("should allow for importing by a tagged image", func() {
+			mockProxy.PullImageCallBack = func() {
+				createBasicImage("ubuntu:10.04")
+			}
+			err := prov.PullImage("ubuntu:10.04")
+			Expect(err).To(BeNil())
+
+			Expect(mockProxy.PullImageCalled).To(BeTrue())
+			Expect(mockProxy.PullImageOpts.Repository).To(Equal("ubuntu"))
+			Expect(mockProxy.PullImageOpts.Tag).To(Equal("10.04"))
+			Expect(mockProxy.PullImageAuth.Username).To(Equal("test"))
+			Expect(mockProxy.PullImageAuth.Password).To(ContainSubstring("1234xxcc"))
+			Expect(mockProxy.PullImageAuth.Email).To(Equal("docker@callumj.com"))
+
+			checkImageRenamed("ubuntu:10.04")
+		})
+
+		It("should allow for importing by simple remote registry", func() {
+			mockProxy.PullImageCallBack = func() {
+				createBasicImage("quay.io/ubuntu")
+			}
+			err := prov.PullImage("quay.io/ubuntu")
+			Expect(err).To(BeNil())
+
+			Expect(mockProxy.PullImageCalled).To(BeTrue())
+			Expect(mockProxy.PullImageOpts.Repository).To(Equal("quay.io/ubuntu"))
+			Expect(mockProxy.PullImageOpts.Tag).To(HaveLen(0))
+			Expect(mockProxy.PullImageAuth.Username).To(Equal("testo"))
+			Expect(mockProxy.PullImageAuth.Password).To(ContainSubstring("Password1"))
+			Expect(mockProxy.PullImageAuth.Email).To(Equal("quay@callumj.com"))
+
+			checkImageRenamed("quay.io/ubuntu:latest")
+		})
+
 		It("should allow for importing by remote registry", func() {
+			mockProxy.PullImageCallBack = func() {
+				createBasicImage("quay.io/quay/ubuntu")
+			}
 			err := prov.PullImage("quay.io/quay/ubuntu")
 			Expect(err).To(BeNil())
+
+			Expect(mockProxy.PullImageCalled).To(BeTrue())
+			Expect(mockProxy.PullImageOpts.Repository).To(Equal("quay.io/quay/ubuntu"))
+			Expect(mockProxy.PullImageOpts.Tag).To(HaveLen(0))
+			Expect(mockProxy.PullImageAuth.Username).To(Equal("testo"))
+			Expect(mockProxy.PullImageAuth.Password).To(ContainSubstring("Password1"))
+			Expect(mockProxy.PullImageAuth.Email).To(Equal("quay@callumj.com"))
+
 			checkImageRenamed("quay.io/quay/ubuntu:latest")
+		})
+
+		It("should handle a malformed config", func() {
+			err := prov.PullImage("magic.io/quay/ubuntu")
+			Expect(err).To(Equal(provider.ErrImageAuthMisconfigured))
+
+			Expect(mockProxy.PullImageCalled).To(BeFalse())
+		})
+
+		It("should surface PushImage errors", func() {
+			sharedErr := errors.New("Sorry!")
+			mockProxy.PullImageError = sharedErr
+			err := prov.PullImage("quay/ubuntu")
+			Expect(err).To(Equal(sharedErr))
+
+			Expect(mockProxy.PullImageCalled).To(BeTrue())
 		})
 
 	})
@@ -1245,10 +1365,6 @@ var _ = Describe("provider/docker", func() {
 			removeCreated(created)
 		})
 
-		It("should allow for referencing an image by its ID", func() {
-
-		})
-
 		Context("image tag already exists", func() {
 
 			It("should not override existing tags with no force", func() {
@@ -1277,7 +1393,7 @@ var _ = Describe("provider/docker", func() {
 
 	})
 
-	FDescribe("PushImage()", func() {
+	Describe(".PushImage()", func() {
 
 		It("should not push if the image is not accessible", func() {
 			created := createImages(1, "namely", true, true, false)
@@ -1340,7 +1456,7 @@ var _ = Describe("provider/docker", func() {
 			It("should handle if auth credentials could not be located", func() {
 				created := createImages(1, "namely", false, false, false)
 				err := prov.PushImage(withoutNamespace(created[0]), "thingyquay.io/callumj/test1")
-				Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
+				Expect(err).To(Equal(provider.ErrImageAuthNotAllowed))
 
 				Expect(mockProxy.PushImageCalled).To(BeFalse())
 

@@ -14,7 +14,7 @@ var (
 	ErrImageNotFound          = errors.New("Image does not exist")
 	ErrImageShared            = errors.New("Image is shared across multiple tags")
 	ErrImageTagExists         = errors.New("Image with same tag already exists")
-	ErrImagePushNotAllowed    = errors.New("Do not have permission to push image")
+	ErrImageAuthNotAllowed    = errors.New("Do not have permission to push/pull image")
 	ErrImageAuthMisconfigured = errors.New("Image registry configuration invalid")
 )
 
