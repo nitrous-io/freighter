@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -52,7 +51,7 @@ type lookupImageResult struct {
 	FoundByID     bool
 }
 
-func NewDockerProvider(logger *util.Logger, dataPath string, namespace string) (*DockerProvider, error) {
+func NewDockerProvider(logger *util.Logger, dataPath, namespace string) (*DockerProvider, error) {
 	if logger == nil || dataPath == "" || namespace == "" {
 		return nil, errors.New("docker.NewDockerProvider: invalid argument")
 	}
@@ -541,18 +540,13 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 	matchingImage, _ := lookupResult.MatchingImage, lookupResult.FoundByID
 	splits := strings.Split(location, "/")
 
-	var registry, remainder string
+	var registry string
 	if len(splits) >= 3 {
 		registry = splits[0]
-		remainder = strings.Join(splits[1:len(splits)], "/")
-	} else {
-		remainder = location
-		registry = "docker.io"
 	}
 
-	repository, location := extractRepoAndTag(remainder)
-	finalName := strings.Join([]string{repository, location}, ":")
-
+	repository, tag := extractRepoAndTag(location)
+	finalName := strings.Join([]string{repository, tag}, ":")
 	args := []string{
 		"tag",
 		"-f",
@@ -571,12 +565,13 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 		return err
 	}
 
-	fmt.Printf("Auth: %v\n", auth)
-	fmt.Printf("Registry: %v, Name: %v\n", registry, finalName)
 	var buf bytes.Buffer
+
+	// while PushImageOptions contains a Registry attribute, it does not work
+	// docker push XXXXXX calls the API with the full name (registry and repository) as the image name
 	pushOpts := dockerclient.PushImageOptions{
 		Name:         repository,
-		Registry:     registry,
+		Tag:          tag,
 		OutputStream: &buf,
 	}
 	err = p.client.PushImage(pushOpts, auth)
@@ -589,6 +584,10 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 }
 
 func fetchAuthenticationInfoBestMatch(registry string) (dockerclient.AuthConfiguration, error) {
+	if len(registry) == 0 {
+		registry = "docker.io"
+	}
+
 	currentUser, err := user.Current()
 	if err != nil {
 		return dockerclient.AuthConfiguration{}, err

@@ -1294,12 +1294,27 @@ var _ = Describe("provider/docker", func() {
 			removeCreated(created)
 		})
 
-		It("should support pushing to respective endpoint", func() {
-			created := createImages(1, "namely", false, false, false)
-			err := prov.PushImage(withoutNamespace(created[0]), "quay.io/callumj/test1")
-			Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
+		Context("with an dockercfg authentication file", func() {
 
-			removeCreated(created)
+			var (
+				mockClient MockDockerClient
+			)
+
+			BeforeEach(func() {
+				mockClient = MockDockerClient{}
+				var err error
+				prov, err = docker.NewDockerProvider(logger, datadir, namespace, "", &mockClient)
+				Expect(err).To(BeNil())
+			})
+
+			It("should support pushing to respective endpoint", func() {
+				created := createImages(1, "namely", false, false, false)
+				err := prov.PushImage(withoutNamespace(created[0]), "callumj/test1:n1")
+				Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
+
+				removeCreated(created)
+			})
+
 		})
 
 	})

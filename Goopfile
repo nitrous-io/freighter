@@ -1,6 +1,6 @@
 github.com/onsi/ginkgo/ginkgo
 github.com/onsi/gomega
 github.com/gorilla/mux
-github.com/fsouza/go-dockerclient #194816684825a3abf28d60e5243ec5240608414d
+github.com/fsouza/go-dockerclient #4fc0e0dbba85f2f799aa77cea594d40267f5bd5a
 github.com/kr/pty #67e2db24c831afa6c64fc17b4a143390674365ef
 github.com/nitrous-io/nitrous-common #534a33b553508b717d30d28160f8dbebb482f16c !git@github.com:nitrous-io/nitrous-common
