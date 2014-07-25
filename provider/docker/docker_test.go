@@ -1186,7 +1186,7 @@ var _ = Describe("provider/docker", func() {
 
 	})
 
-	FDescribe(".TagImage()", func() {
+	Describe(".TagImage()", func() {
 
 		verifyImageExistence := func(name string) {
 			parts := strings.Split(name, ":")
@@ -1272,6 +1272,34 @@ var _ = Describe("provider/docker", func() {
 				removeCreated(destination)
 			})
 
+		})
+
+	})
+
+	FDescribe("PushImage()", func() {
+
+		It("should not push if the image is not accessible", func() {
+			created := createImages(1, "namely", true, true, false)
+			err := prov.PushImage(created[0], "cloud1")
+			Expect(err).To(Equal(provider.ErrImageNotFound))
+
+			removeCreated(created)
+		})
+
+		It("should handle if the push is not allowed", func() {
+			created := createImages(1, "namely", false, false, false)
+			err := prov.PushImage(withoutNamespace(created[0]), "thingyquay.io/callumj/test1")
+			Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
+
+			removeCreated(created)
+		})
+
+		It("should support pushing to respective endpoint", func() {
+			created := createImages(1, "namely", false, false, false)
+			err := prov.PushImage(withoutNamespace(created[0]), "quay.io/callumj/test1")
+			Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
+
+			removeCreated(created)
 		})
 
 	})

@@ -9,11 +9,13 @@ import (
 
 var containerNameRe = regexp.MustCompile(`\A[a-z][a-z0-9\-]*[a-z0-9]\z`)
 var (
-	ErrTimeout               = errors.New("Operation timed out")
-	ErrPubKeyOpsNotSupported = errors.New("Public key operations are not supported on this container")
-	ErrImageNotFound         = errors.New("Image does not exist")
-	ErrImageShared           = errors.New("Image is shared across multiple tags")
-	ErrImageTagExists        = errors.New("Image with same tag already exists")
+	ErrTimeout                = errors.New("Operation timed out")
+	ErrPubKeyOpsNotSupported  = errors.New("Public key operations are not supported on this container")
+	ErrImageNotFound          = errors.New("Image does not exist")
+	ErrImageShared            = errors.New("Image is shared across multiple tags")
+	ErrImageTagExists         = errors.New("Image with same tag already exists")
+	ErrImagePushNotAllowed    = errors.New("Do not have permission to push image")
+	ErrImageAuthMisconfigured = errors.New("Image registry configuration invalid")
 )
 
 type Provider interface {
@@ -42,7 +44,8 @@ type Provider interface {
 	BuildImage(name string, incoming io.Reader, result io.Writer) error
 	RemoveImage(imageIdOrName string) error
 	PullImage(location string, result io.Writer) error
-	TagImage(imageIdOrName, newName string) error
+	TagImage(imageIDOrName, newName string) error
+	PushImage(imageIDOrName, location string) error
 }
 
 type ContainerInfo struct {
