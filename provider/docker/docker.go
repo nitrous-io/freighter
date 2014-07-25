@@ -44,6 +44,11 @@ type DockerProvider struct {
 	dataPath  string
 	namespace string
 	logger    *util.Logger
+
+	DockerClientProxy interface {
+		PushImage(opts dockerclient.PushImageOptions, auth dockerclient.AuthConfiguration) error
+	}
+	DockerConfigLocation string
 }
 
 type lookupImageResult struct {
@@ -59,7 +64,7 @@ func NewDockerProvider(logger *util.Logger, dataPath, namespace string) (*Docker
 	if err != nil {
 		return nil, err
 	}
-	return &DockerProvider{client: client, dataPath: dataPath, namespace: namespace + ".", logger: logger}, nil
+	return &DockerProvider{client: client, dataPath: dataPath, namespace: namespace + ".", logger: logger, DockerClientProxy: client}, nil
 }
 
 func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
@@ -546,6 +551,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 	}
 
 	repository, tag := extractRepoAndTag(location)
+
 	finalName := strings.Join([]string{repository, tag}, ":")
 	args := []string{
 		"tag",
@@ -559,7 +565,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 		return err
 	}
 
-	auth, err := fetchAuthenticationInfoBestMatch(registry)
+	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
 
 	if err != nil {
 		return err
@@ -567,14 +573,21 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 
 	var buf bytes.Buffer
 
+	var tagToPush string
+	if tag == "latest" && strings.HasSuffix(location, ":latest") {
+		tagToPush = "latest"
+	} else if tag != "latest" {
+		tagToPush = tag
+	}
+
 	// while PushImageOptions contains a Registry attribute, it does not work
 	// docker push XXXXXX calls the API with the full name (registry and repository) as the image name
 	pushOpts := dockerclient.PushImageOptions{
 		Name:         repository,
-		Tag:          tag,
+		Tag:          tagToPush,
 		OutputStream: &buf,
 	}
-	err = p.client.PushImage(pushOpts, auth)
+	err = p.DockerClientProxy.PushImage(pushOpts, auth)
 
 	if err != nil {
 		return err
@@ -583,21 +596,14 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 	return nil
 }
 
-func fetchAuthenticationInfoBestMatch(registry string) (dockerclient.AuthConfiguration, error) {
+func (p *DockerProvider) fetchAuthenticationInfoBestMatch(registry string) (dockerclient.AuthConfiguration, error) {
 	if len(registry) == 0 {
 		registry = "docker.io"
 	}
 
-	currentUser, err := user.Current()
+	authPath, err := p.dockerConfigLocation()
 	if err != nil {
-		return dockerclient.AuthConfiguration{}, err
-	}
-	currentUserHomeDir := currentUser.HomeDir
-	authPath := path.Join(currentUserHomeDir, ".dockercfg")
-
-	_, err = os.Stat(authPath)
-	if err != nil {
-		return dockerclient.AuthConfiguration{}, err
+		return dockerclient.AuthConfiguration{}, provider.ErrImageAuthMisconfigured
 	}
 
 	fileContents, err := ioutil.ReadFile(authPath)
@@ -646,6 +652,25 @@ func fetchAuthenticationInfoBestMatch(registry string) (dockerclient.AuthConfigu
 	}
 
 	return dockerclient.AuthConfiguration{}, provider.ErrImagePushNotAllowed
+}
+
+func (p *DockerProvider) dockerConfigLocation() (string, error) {
+	if len(p.DockerConfigLocation) != 0 {
+		return p.DockerConfigLocation, nil
+	}
+
+	currentUser, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	currentUserHomeDir := currentUser.HomeDir
+	authPath := path.Join(currentUserHomeDir, ".dockercfg")
+
+	_, err = os.Stat(authPath)
+	if err != nil {
+		return "", err
+	}
+	return authPath, nil
 }
 
 func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, error) {

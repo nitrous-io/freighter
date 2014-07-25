@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1286,31 +1287,136 @@ var _ = Describe("provider/docker", func() {
 			removeCreated(created)
 		})
 
-		It("should handle if the push is not allowed", func() {
-			created := createImages(1, "namely", false, false, false)
-			err := prov.PushImage(withoutNamespace(created[0]), "thingyquay.io/callumj/test1")
-			Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
-
-			removeCreated(created)
-		})
-
 		Context("with an dockercfg authentication file", func() {
 
 			var (
-				mockClient MockDockerClient
+				mockProxy    *MockDockerProxy
+				tempAuthFile *os.File
 			)
 
 			BeforeEach(func() {
-				mockClient = MockDockerClient{}
 				var err error
-				prov, err = docker.NewDockerProvider(logger, datadir, namespace, "", &mockClient)
+
+				mockProxy = &MockDockerProxy{}
+				tempAuthFile, err = ioutil.TempFile("", "cfg")
 				Expect(err).To(BeNil())
+
+				/* credientials are
+				test:1234xxcc
+				testo:Password1
+				magic:abc34x1
+				*/
+				authFileSrc := `
+				{
+				  "https://index.docker.io/v1/": {
+				    "auth": "dGVzdDoxMjM0eHhjYwo=",
+				    "email": "docker@callumj.com"
+				  },
+				  "quay.io": {
+				    "auth": "dGVzdG86UGFzc3dvcmQxCg==",
+				    "email": "quay@callumj.com"
+				  },
+				  "cloud.inc": {
+				    "auth": "bWFnaWM6YWJjMzR4MQo=",
+				    "email": "cloud@callumj.com"
+				  },
+				  "magic.io": {}
+				}
+				`
+
+				_, err = tempAuthFile.WriteString(authFileSrc)
+				Expect(err).To(BeNil())
+				err = tempAuthFile.Sync()
+				Expect(err).To(BeNil())
+
+				prov.DockerClientProxy = mockProxy
+				prov.DockerConfigLocation = tempAuthFile.Name()
 			})
 
-			It("should support pushing to respective endpoint", func() {
+			AfterEach(func() {
+				tempAuthFile.Close()
+			})
+
+			It("should handle if auth credentials could not be located", func() {
+				created := createImages(1, "namely", false, false, false)
+				err := prov.PushImage(withoutNamespace(created[0]), "thingyquay.io/callumj/test1")
+				Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
+
+				Expect(mockProxy.PushImageCalled).To(BeFalse())
+
+				removeCreated(created)
+			})
+
+			It("should support pushing to the standard Docker Registry endpoint", func() {
 				created := createImages(1, "namely", false, false, false)
 				err := prov.PushImage(withoutNamespace(created[0]), "callumj/test1:n1")
-				Expect(err).To(Equal(provider.ErrImagePushNotAllowed))
+				Expect(err).To(BeNil())
+
+				Expect(mockProxy.PushImageCalled).To(BeTrue())
+				Expect(mockProxy.PushImageOpts.Name).To(Equal("callumj/test1"))
+				Expect(mockProxy.PushImageOpts.Tag).To(Equal("n1"))
+				Expect(mockProxy.PushImageAuth.Username).To(Equal("test"))
+				Expect(mockProxy.PushImageAuth.Password).To(ContainSubstring("1234xxcc"))
+				Expect(mockProxy.PushImageAuth.Email).To(Equal("docker@callumj.com"))
+
+				removeCreated(created)
+			})
+
+			It("should not set tag if not explicit", func() {
+				created := createImages(1, "namely", false, false, false)
+				err := prov.PushImage(withoutNamespace(created[0]), "callumj/test1")
+				Expect(err).To(BeNil())
+
+				Expect(mockProxy.PushImageCalled).To(BeTrue())
+				Expect(mockProxy.PushImageOpts.Tag).To(HaveLen(0))
+
+				removeCreated(created)
+			})
+
+			It("should set tag if latest is explicit", func() {
+				created := createImages(1, "namely", false, false, false)
+				err := prov.PushImage(withoutNamespace(created[0]), "callumj/test1:latest")
+				Expect(err).To(BeNil())
+
+				Expect(mockProxy.PushImageCalled).To(BeTrue())
+				Expect(mockProxy.PushImageOpts.Tag).To(Equal("latest"))
+
+				removeCreated(created)
+			})
+
+			It("should support pushing to an alternative endpoint", func() {
+				created := createImages(1, "namely", false, false, false)
+				err := prov.PushImage(withoutNamespace(created[0]), "quay.io/callumj/test1")
+				Expect(err).To(BeNil())
+
+				Expect(mockProxy.PushImageCalled).To(BeTrue())
+				Expect(mockProxy.PushImageOpts.Name).To(Equal("quay.io/callumj/test1"))
+				Expect(mockProxy.PushImageOpts.Tag).To(HaveLen(0))
+				Expect(mockProxy.PushImageAuth.Username).To(Equal("testo"))
+				Expect(mockProxy.PushImageAuth.Password).To(ContainSubstring("Password1"))
+				Expect(mockProxy.PushImageAuth.Email).To(Equal("quay@callumj.com"))
+
+				removeCreated(created)
+			})
+
+			It("should handle a malformed config", func() {
+				created := createImages(1, "namely", false, false, false)
+				err := prov.PushImage(withoutNamespace(created[0]), "magic.io/callumj/test1")
+				Expect(err).To(Equal(provider.ErrImageAuthMisconfigured))
+
+				Expect(mockProxy.PushImageCalled).To(BeFalse())
+
+				removeCreated(created)
+			})
+
+			It("should surface PushImage errors", func() {
+				created := createImages(1, "namely", false, false, false)
+				sharedErr := errors.New("Sorry!")
+				mockProxy.PushImageError = sharedErr
+				err := prov.PushImage(withoutNamespace(created[0]), "quay.io/callumj/test1")
+				Expect(err).To(Equal(sharedErr))
+
+				Expect(mockProxy.PushImageCalled).To(BeTrue())
 
 				removeCreated(created)
 			})
