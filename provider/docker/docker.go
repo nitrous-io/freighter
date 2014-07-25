@@ -81,7 +81,6 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 
 func (p *DockerProvider) Create(name, imageName, configJSON string) (*provider.ContainerInfo, error) {
 	err := p.createAuthorizedKeys(p.namespace+name, []string{})
-
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +91,6 @@ func (p *DockerProvider) Create(name, imageName, configJSON string) (*provider.C
 	}
 
 	container, err := p.createContainer(imageName, name, config, hostConfig)
-
 	if err != nil {
 		return nil, err
 	}
@@ -107,12 +105,14 @@ func (p *DockerProvider) GetInfo(id string) (*provider.ContainerInfo, error) {
 	}
 
 	return &provider.ContainerInfo{
-		ID:    container.ID,
-		Name:  nameFromContainer(container),
-		Image: container.Config.Image,
-		Host:  container.NetworkSettings.IPAddress,
-		Ports: portsFromContainer(container),
-		State: stateFromContainer(container),
+		ID:         container.ID,
+		Name:       nameFromContainer(container),
+		Image:      container.Config.Image,
+		Host:       container.NetworkSettings.IPAddress,
+		Ports:      portsFromContainer(container),
+		State:      stateFromContainer(container),
+		ExitCode:   container.State.ExitCode,
+		FinishedAt: finishedAtFromContainer(container),
 	}, nil
 }
 
@@ -547,6 +547,16 @@ func stateFromContainer(container *dockerclient.Container) string {
 		return provider.ContainerStateRunning
 	}
 	return provider.ContainerStateStopped
+}
+
+func finishedAtFromContainer(container *dockerclient.Container) time.Time {
+	if container.State.Running {
+		// If a container has previously finished but is now running again,
+		// FinishedAt retains its previous value, but we want a zero-value
+		// FinishedAt in this case.
+		return time.Time{}
+	}
+	return container.State.FinishedAt
 }
 
 func portsFromContainer(container *dockerclient.Container) (ports map[string]int) {

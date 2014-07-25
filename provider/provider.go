@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"regexp"
+	"time"
 )
 
 var containerNameRe = regexp.MustCompile(`\A[a-z][a-z0-9\-]*[a-z0-9]\z`)
@@ -39,12 +40,14 @@ type Provider interface {
 }
 
 type ContainerInfo struct {
-	ID    string         `json:"id"`
-	Name  string         `json:"name"`
-	Image string         `json:"image"`
-	Host  string         `json:"host"`
-	State string         `json:"state"`
-	Ports map[string]int `json:"ports"`
+	ID         string         `json:"id"`
+	Name       string         `json:"name"`
+	Image      string         `json:"image"`
+	Host       string         `json:"host"`
+	State      string         `json:"state"`
+	Ports      map[string]int `json:"ports"`
+	ExitCode   int            `json:"exit_code"`
+	FinishedAt time.Time      `json:"finished_at"`
 }
 
 type ContainerConfig interface {

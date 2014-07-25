@@ -3,6 +3,7 @@ package test
 import (
 	"errors"
 	"io"
+	"time"
 
 	"github.com/nitrous-io/freighter/provider"
 )
@@ -113,6 +114,7 @@ func (p *MockProvider) Stop(id string) (*provider.ContainerInfo, error) {
 	if info != nil {
 		info.Host = ""
 		info.State = provider.ContainerStateStopped
+		info.FinishedAt = time.Date(2013, time.January, 1, 1, 0, 0, 0, time.UTC)
 	}
 	p.StopCalled = true
 	p.ReceivedID = id
@@ -134,6 +136,7 @@ func (p *MockProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 	if info != nil {
 		info.Host = ""
 		info.State = ""
+		info.FinishedAt = time.Date(2014, time.February, 2, 2, 0, 0, 0, time.UTC)
 	}
 	p.TerminateCalled = true
 	p.ReceivedID = id

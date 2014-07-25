@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/nitrous-io/freighter/provider"
@@ -79,7 +80,7 @@ var _ = Describe("server", func() {
 			BeforeEach(func() {
 				prov.Containers = []*provider.ContainerInfo{
 					{ID: "aaa", Name: "foo", Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning},
-					{ID: "bbb", Name: "bar", Image: "centos", Host: "1.2.3.5", State: provider.ContainerStateStopped},
+					{ID: "bbb", Name: "bar", Image: "centos", Host: "1.2.3.5", State: provider.ContainerStateStopped, ExitCode: 1, FinishedAt: time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)},
 				}
 				doRequest()
 			})
@@ -87,8 +88,8 @@ var _ = Describe("server", func() {
 			It("responds with 200 ok with container info array", func() {
 				Expect(res.Code).To(Equal(http.StatusOK))
 				Expect(res.Body.String()).To(MatchJSON(`{"containers":[
-					{"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","state":"running","ports":null},
-					{"id":"bbb","name":"bar","image":"centos","host":"1.2.3.5","state":"stopped","ports":null}
+					{"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","state":"running","ports":null,"exit_code":0,"finished_at":"0001-01-01T00:00:00Z"},
+					{"id":"bbb","name":"bar","image":"centos","host":"1.2.3.5","state":"stopped","ports":null,"exit_code":1,"finished_at":"2009-11-10T23:00:00Z"}
 				]}`))
 			})
 		})
@@ -156,7 +157,7 @@ var _ = Describe("server", func() {
 					It("responds with 200 OK and container info", func() {
 						Expect(res.Code).To(Equal(http.StatusOK))
 						Expect(res.Body.String()).To(MatchJSON(`{"container":{
-							"id":"aaa","name":"fragrant-wind-69","image":"ubuntu","host":"1.2.3.4","state":"running","ports": null
+							"id":"aaa","name":"fragrant-wind-69","image":"ubuntu","host":"1.2.3.4","state":"running","ports": null,"exit_code":0,"finished_at":"0001-01-01T00:00:00Z"
 						}}`))
 					})
 				})
@@ -239,7 +240,7 @@ var _ = Describe("server", func() {
 			It("responds with 200 ok with container information", func() {
 				Expect(res.Code).To(Equal(http.StatusOK))
 				Expect(res.Body.String()).To(MatchJSON(`{"container":{
-					"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","state":"running","ports":null
+					"id":"aaa","name":"foo","image":"ubuntu","host":"1.2.3.4","state":"running","ports":null,"exit_code":0,"finished_at":"0001-01-01T00:00:00Z"
 				}}`))
 			})
 		})
@@ -334,9 +335,11 @@ var _ = Describe("server", func() {
 						"image": "` + image + `",
 						"host": "",
 						"state": "",
-						"ports": null
+						"ports": null,
+						"exit_code": 0,
+						"finished_at": "2014-02-02T02:00:00Z"
 					}
-				}`
+				}` // Mock provider sets FinishedAt to a fixed value.
 
 				doRequest = func(id string) {
 					req, err = NewRequest("DELETE", fmt.Sprintf("/containers/%v", id), params)
@@ -360,7 +363,9 @@ var _ = Describe("server", func() {
 						"image": "` + image + `",
 						"host": "` + host + `",
 						"state": "running",
-						"ports": null
+						"ports": null,
+						"exit_code": 0,
+						"finished_at": "0001-01-01T00:00:00Z"
 					}
 				}`
 
@@ -392,9 +397,11 @@ var _ = Describe("server", func() {
 						"image": "` + image + `",
 						"host": "",
 						"state": "stopped",
-						"ports": null
+						"ports": null,
+						"exit_code": 0,
+						"finished_at": "2013-01-01T01:00:00Z"
 					}
-				}`
+				}` // Mock provider sets FinishedAt to a fixed value.
 
 				doRequest = func(id string) {
 					req, err = NewFormRequest("POST", fmt.Sprintf("/containers/%v/stop", id), params)
@@ -418,7 +425,9 @@ var _ = Describe("server", func() {
 						"image": "` + image + `",
 						"host": "` + host + `",
 						"state": "running",
-						"ports": null
+						"ports": null,
+						"exit_code": 0,
+						"finished_at": "0001-01-01T00:00:00Z"
 					}
 				}`
 
