@@ -433,7 +433,7 @@ func (p *DockerProvider) ListImages() ([]*provider.ImageInfo, error) {
 	return list, nil
 }
 
-func (p *DockerProvider) BuildImage(name string, incoming io.Reader, result io.Writer) error {
+func (p *DockerProvider) BuildImage(name string, incoming io.Reader, result io.Writer) (provider.ImageInfo, error) {
 	prefixedName := strings.Join([]string{p.namespace, name}, "")
 
 	buildOptions := dockerclient.BuildImageOptions{
@@ -442,7 +442,18 @@ func (p *DockerProvider) BuildImage(name string, incoming io.Reader, result io.W
 		OutputStream: result,
 	}
 
-	return p.client.BuildImage(buildOptions)
+	err := p.client.BuildImage(buildOptions)
+
+	if err != nil {
+		return provider.ImageInfo{}, err
+	}
+
+	info, err := p.lookupImage(name)
+	if err != nil {
+		return provider.ImageInfo{}, err
+	}
+
+	return info.MatchingImage, nil
 }
 
 func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
@@ -468,7 +479,7 @@ func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
 	return err
 }
 
-func (p *DockerProvider) PullImage(location string) error {
+func (p *DockerProvider) PullImage(location string) (provider.ImageInfo, error) {
 	repository, tag := extractRepoAndTag(location)
 
 	var tagToPush string
@@ -492,7 +503,7 @@ func (p *DockerProvider) PullImage(location string) error {
 	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
 
 	if err != nil {
-		return err
+		return provider.ImageInfo{}, err
 	}
 
 	var buf bytes.Buffer
@@ -505,7 +516,7 @@ func (p *DockerProvider) PullImage(location string) error {
 	err = p.DockerClientProxy.PullImage(pullOpts, auth)
 
 	if err != nil {
-		return err
+		return provider.ImageInfo{}, err
 	}
 
 	newRepo := strings.Join([]string{p.namespace, repository}, "")
@@ -522,10 +533,21 @@ func (p *DockerProvider) PullImage(location string) error {
 	err = exec.Command("docker", args...).Run()
 
 	if err != nil {
-		return err
+		return provider.ImageInfo{}, err
 	}
 
-	return p.client.RemoveImage(existingName)
+	err = p.client.RemoveImage(existingName)
+
+	if err != nil {
+		return provider.ImageInfo{}, err
+	}
+
+	located, err := p.lookupImage(strings.TrimPrefix(newName, p.namespace))
+	if err != nil {
+		return provider.ImageInfo{}, err
+	}
+
+	return located.MatchingImage, nil
 }
 
 func (p *DockerProvider) PushImage(imageIDOrName, location string) error {

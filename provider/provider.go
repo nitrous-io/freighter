@@ -41,9 +41,9 @@ type Provider interface {
 	Logout(registry string) error
 
 	ListImages() (infoList []*ImageInfo, err error)
-	BuildImage(name string, incoming io.Reader, result io.Writer) error
+	BuildImage(name string, incoming io.Reader, result io.Writer) (ImageInfo, error)
 	RemoveImage(imageIdOrName string) error
-	PullImage(location string) error
+	PullImage(location string) (ImageInfo, error)
 	TagImage(imageIDOrName, newName string, force bool) error
 	PushImage(imageIDOrName, location string) error
 }

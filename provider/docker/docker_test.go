@@ -869,24 +869,33 @@ var _ = Describe("provider/docker", func() {
 
 		Context("with one image", func() {
 			var (
-				createdImages []string
+				publicImages    []string
+				nonPublicImages []string
 			)
 
 			BeforeEach(func() {
-				createdImages = createImages(1, "basic", true, false, false)
+				publicImages = createImages(1, "basic", false, false, false)
+				nonPublicImages = createImages(1, "basicprivate", true, true, false)
 			})
 
 			AfterEach(func() {
-				removeCreated(createdImages)
+				removeCreated(publicImages)
+				removeCreated(nonPublicImages)
 			})
 
 			It("should not expose images not managed by the namespace", func() {
 				imageList, err := prov.ListImages()
 				Expect(err).To(BeNil())
 
-				Expect(imageList).To(HaveLen(1))
+				var found bool
+				for _, img := range imageList {
+					Expect(img.Name).ToNot(ContainSubstring("basicprivate"))
+					if strings.Contains(img.Name, "basic") {
+						found = true
+					}
+				}
 
-				Expect(imageList[0].Name).To(Equal("basic"))
+				Expect(found).To(BeTrue())
 			})
 
 			It("should fetch the basic info about an Image", func() {
@@ -921,7 +930,7 @@ var _ = Describe("provider/docker", func() {
 			)
 
 			BeforeEach(func() {
-				createdImages = createImages(2, "multiple", true, false, false)
+				createdImages = createImages(2, "multiple", true, false, true)
 			})
 
 			AfterEach(func() {
@@ -1009,8 +1018,9 @@ var _ = Describe("provider/docker", func() {
 		It("creates an Image successfully", func() {
 			readBuf := createImageTarball()
 			outputBuffer := new(bytes.Buffer)
-			err := prov.BuildImage("myimage", readBuf, outputBuffer)
+			info, err := prov.BuildImage("myimage", readBuf, outputBuffer)
 			Expect(err).To(BeNil())
+			Expect(info.ID).ToNot(HaveLen(0))
 
 			Expect(outputBuffer.String()).To(ContainSubstring("Successfully built"))
 
@@ -1020,9 +1030,10 @@ var _ = Describe("provider/docker", func() {
 		It("correctly stores the additional data", func() {
 			readBuf := createImageTarball()
 			outputBuffer := new(bytes.Buffer)
-			err := prov.BuildImage("myimage", readBuf, outputBuffer)
+			info, err := prov.BuildImage("myimage", readBuf, outputBuffer)
 			Expect(err).To(BeNil())
 
+			Expect(info.ID).ToNot(HaveLen(0))
 			allImages, err := prov.ListImages()
 			Expect(err).To(BeNil())
 
@@ -1136,7 +1147,7 @@ var _ = Describe("provider/docker", func() {
 
 	})
 
-	FDescribe(".PullImage()", func() {
+	Describe(".PullImage()", func() {
 
 		var (
 			mockProxy    *MockDockerProxy
@@ -1215,9 +1226,9 @@ var _ = Describe("provider/docker", func() {
 		})
 
 		It("should handle if auth credentials could not be located", func() {
-			err := prov.PullImage("cloudy.io/nodejs")
+			info, err := prov.PullImage("cloudy.io/nodejs")
 			Expect(err).To(Equal(provider.ErrImageAuthNotAllowed))
-
+			Expect(info.ID).To(HaveLen(0))
 			Expect(mockProxy.PullImageCalled).To(BeFalse())
 		})
 
@@ -1225,7 +1236,7 @@ var _ = Describe("provider/docker", func() {
 			mockProxy.PullImageCallBack = func() {
 				createBasicImage("nitrousio/nodejs")
 			}
-			err := prov.PullImage("nitrousio/nodejs")
+			info, err := prov.PullImage("nitrousio/nodejs")
 			Expect(err).To(BeNil())
 
 			Expect(mockProxy.PullImageCalled).To(BeTrue())
@@ -1235,6 +1246,8 @@ var _ = Describe("provider/docker", func() {
 			Expect(mockProxy.PullImageAuth.Password).To(ContainSubstring("1234xxcc"))
 			Expect(mockProxy.PullImageAuth.Email).To(Equal("docker@callumj.com"))
 
+			Expect(info.Name).To(ContainSubstring("nitrousio/nodejs"))
+
 			checkImageRenamed("nitrousio/nodejs:latest")
 		})
 
@@ -1242,7 +1255,7 @@ var _ = Describe("provider/docker", func() {
 			mockProxy.PullImageCallBack = func() {
 				createBasicImage("ubuntu:10.04")
 			}
-			err := prov.PullImage("ubuntu:10.04")
+			_, err := prov.PullImage("ubuntu:10.04")
 			Expect(err).To(BeNil())
 
 			Expect(mockProxy.PullImageCalled).To(BeTrue())
@@ -1259,7 +1272,7 @@ var _ = Describe("provider/docker", func() {
 			mockProxy.PullImageCallBack = func() {
 				createBasicImage("quay.io/ubuntu")
 			}
-			err := prov.PullImage("quay.io/ubuntu")
+			_, err := prov.PullImage("quay.io/ubuntu")
 			Expect(err).To(BeNil())
 
 			Expect(mockProxy.PullImageCalled).To(BeTrue())
@@ -1276,7 +1289,7 @@ var _ = Describe("provider/docker", func() {
 			mockProxy.PullImageCallBack = func() {
 				createBasicImage("quay.io/quay/ubuntu")
 			}
-			err := prov.PullImage("quay.io/quay/ubuntu")
+			_, err := prov.PullImage("quay.io/quay/ubuntu")
 			Expect(err).To(BeNil())
 
 			Expect(mockProxy.PullImageCalled).To(BeTrue())
@@ -1290,7 +1303,7 @@ var _ = Describe("provider/docker", func() {
 		})
 
 		It("should handle a malformed config", func() {
-			err := prov.PullImage("magic.io/quay/ubuntu")
+			_, err := prov.PullImage("magic.io/quay/ubuntu")
 			Expect(err).To(Equal(provider.ErrImageAuthMisconfigured))
 
 			Expect(mockProxy.PullImageCalled).To(BeFalse())
@@ -1299,7 +1312,7 @@ var _ = Describe("provider/docker", func() {
 		It("should surface PushImage errors", func() {
 			sharedErr := errors.New("Sorry!")
 			mockProxy.PullImageError = sharedErr
-			err := prov.PullImage("quay/ubuntu")
+			_, err := prov.PullImage("quay/ubuntu")
 			Expect(err).To(Equal(sharedErr))
 
 			Expect(mockProxy.PullImageCalled).To(BeTrue())
@@ -1331,7 +1344,7 @@ var _ = Describe("provider/docker", func() {
 		}
 
 		It("should not allow for tagging images outside of the namespace", func() {
-			created := createImages(1, "namely", true, false, false)
+			created := createImages(1, "namely", true, true, false)
 			err := prov.TagImage(created[0], "namely2", false)
 			Expect(err).To(Equal(provider.ErrImageNotFound))
 
