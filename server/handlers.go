@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -285,6 +286,33 @@ func (s *Server) listImages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"images": listing})
+}
+
+func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) {
+	fn, _, err := r.FormFile("file")
+	if err != nil {
+		s.handleError(w, err)
+	}
+	defer fn.Close()
+
+	name := r.FormValue("name")
+	var buildBuffer bytes.Buffer
+	info, err := s.provider.BuildImage(name, fn, &buildBuffer)
+	if err != nil {
+		output := buildBuffer.String()
+		if len(output) == 0 {
+			s.handleError(w, err)
+		} else {
+			s.respondEncodeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": err.Error(), "output": output})
+			return
+		}
+		return
+	}
+
+	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"image": info, "output": buildBuffer.String()})
+}
+
+func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func hijackServer(w http.ResponseWriter) (io.ReadCloser, io.Writer, error) {
