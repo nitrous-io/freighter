@@ -17,9 +17,9 @@ cache=$HOME/.freighterd-cache
 mkdir -p $cache
 
 # ddollar/dind is built from https://github.com/jpetazzo/dind
-cid=$(docker run --privileged -d -p 4444 -e PORT=4444 ddollar/dind)
-host=$(docker port $cid 4444/tcp)
+cid=$(docker run --privileged -d -e PORT=4444 ddollar/dind)
+ip=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $cid)
 
 trap cleanup EXIT
 
-env DOCKER_HOST=tcp://$host goop exec ginkgo -r -trace -keepGoing -noisyPendings=false $*
+env DOCKER_IP=$ip DOCKER_HOST=tcp://$ip:4444 goop exec ginkgo -r -trace -keepGoing -noisyPendings=false $*

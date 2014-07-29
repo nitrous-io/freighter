@@ -478,16 +478,24 @@ var _ = Describe("provider/docker", func() {
 				})
 
 				Context("with SSH enabled containers", func() {
+					sshTarget := func() (string) {
+						if ip := os.Getenv("DOCKER_IP"); ip != "" {
+							return fmt.Sprintf("action@%s", ip)
+						} else {
+							return "action@localhost"
+						}
+					}
+
 					expectSSHToWork := func(port, sshkeypath string) {
 						time.Sleep(2 * time.Second)
-						out, err := exec.Command("ssh", "action@localhost", "-i", sshkeypath, "-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
+						out, err := exec.Command("ssh", sshTarget(), "-i", sshkeypath, "-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
 						Expect(out).To(ContainSubstring("success"))
 						Expect(err).To(BeNil())
 					}
 
 					expectSSHToNotWork := func(port, sshkeypath string) {
 						time.Sleep(2 * time.Second)
-						out, err := exec.Command("ssh", "action@localhost", "-i", sshkeypath, "-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
+						out, err := exec.Command("ssh", sshTarget(), "-i", sshkeypath, "-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
 						Expect(out).To(ContainSubstring("Permission denied"))
 						Expect(err).ToNot(BeNil())
 					}
