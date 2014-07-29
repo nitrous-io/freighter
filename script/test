@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-goop exec ginkgo -r -trace -keepGoing -noisyPendings=false $*

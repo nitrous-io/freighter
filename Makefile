@@ -28,11 +28,9 @@ format:
 
 test:
 	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
-	@script/test $(TEST)
+	@script/embedded-docker $(TEST)
 
-citest:
-	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
-	@script/run-test
+citest: test
 
 run: build
 	@echo "$(OK_COLOR)==> Running...$(NO_COLOR)"
