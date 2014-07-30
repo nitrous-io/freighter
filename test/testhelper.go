@@ -1,8 +1,10 @@
 package test
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -43,6 +45,39 @@ func NewFormRequest(method string, urlStr string, params *url.Values) (*http.Req
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 	return req, err
+}
+
+func NewFileRequest(method string, urlStr string, params map[string]string, files map[string]string) (*http.Request, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	for key, contents := range files {
+		part, err := writer.CreateFormFile(key, fmt.Sprintf("%s.txt", key))
+		if err != nil {
+			return nil, err
+		}
+		part.Write([]byte(contents))
+	}
+
+	for key, val := range params {
+		_ = writer.WriteField(key, val)
+	}
+
+	err := writer.Close()
+
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(method, urlStr, body)
+
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	return req, nil
 }
 
 func TempFile(extension string) string {
