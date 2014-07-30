@@ -49,8 +49,8 @@ type Provider interface {
 	BuildImage(name string, incoming io.Reader, result io.Writer) (ImageInfo, error)
 	RemoveImage(imageIdOrName string) error
 	PullImage(location string) (ImageInfo, error)
-	TagImage(imageIDOrName, newName string, force bool) error
 	PushImage(imageIDOrName, location string) error
+	TagImage(imageIDOrName, newName string, force bool) error
 
 	CreateVolume(slug string) (*VolumeInfo, error)
 	ListVolumes() ([]string, error)

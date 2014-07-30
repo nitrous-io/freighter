@@ -240,11 +240,11 @@ func (p *MockProvider) PullImage(location string) (provider.ImageInfo, error) {
 	return provider.ImageInfo{}, nil
 }
 
-func (p *MockProvider) TagImage(imageIDOrName, newName string, force bool) error {
+func (p *MockProvider) PushImage(imageIDOrName, location string) error {
 	return nil
 }
 
-func (p *MockProvider) PushImage(imageIDOrName, location string) error {
+func (p *MockProvider) TagImage(imageIDOrName, newName string, force bool) error {
 	return nil
 }
 
