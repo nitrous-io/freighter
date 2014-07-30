@@ -385,6 +385,7 @@ func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) {
 	fn, _, err := r.FormFile("file")
 	if err != nil {
 		s.handleError(w, err)
+		return
 	}
 	defer fn.Close()
 
@@ -405,7 +406,50 @@ func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) {
 	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"image": info, "output": buildBuffer.String()})
 }
 
-func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) error {
+	slug := mux.Vars(r)["slug"]
+	err := s.provider.RemoveImage(slug)
+	if err != nil {
+		return err
+	}
+	s.respond(w, http.StatusOK, jsonStatusOK)
+	return nil
+}
+
+func (s *Server) pullImage(w http.ResponseWriter, r *http.Request) error {
+	slug := mux.Vars(r)["slug"]
+	info, err := s.provider.PullImage(slug)
+	if err != nil {
+		return err
+	}
+	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"image": info})
+	return nil
+}
+
+func (s *Server) pushImage(w http.ResponseWriter, r *http.Request) error {
+	slug := mux.Vars(r)["slug"]
+	location := mux.Vars(r)["location"]
+	err := s.provider.PushImage(slug, location)
+	if err != nil {
+		return err
+	}
+	s.respond(w, http.StatusOK, jsonStatusOK)
+	return nil
+}
+
+func (s *Server) tagImage(w http.ResponseWriter, r *http.Request) error {
+	slug := mux.Vars(r)["slug"]
+	tag := mux.Vars(r)["tag"]
+	force := false
+	if mux.Vars(r)["force"] == "true" {
+		force = true
+	}
+	err := s.provider.TagImage(slug, tag, force)
+	if err != nil {
+		return err
+	}
+	s.respond(w, http.StatusOK, jsonStatusOK)
+	return nil
 }
 
 func hijackServer(w http.ResponseWriter) (io.ReadCloser, io.Writer, error) {

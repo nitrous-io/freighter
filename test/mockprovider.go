@@ -85,6 +85,24 @@ type MockProvider struct {
 	ListImagesContents []*provider.ImageInfo
 	ListImagesError    error
 
+	BuildImageCalled bool
+	BuildImageOutput string
+	BuildImageReturn *provider.ImageInfo
+	BuildImageError  error
+
+	RemoveImageCalled bool
+	RemoveImageError  error
+
+	PullImageCalled bool
+	PullImageReturn *provider.ImageInfo
+	PullImageError  error
+
+	PushImageCalled bool
+	PushImageError  error
+
+	TagImageCalled bool
+	TagImageError  error
+
 	Containers []*provider.ContainerInfo
 	PublicKeys map[string]string
 }
@@ -228,23 +246,55 @@ func (p *MockProvider) ListImages() ([]*provider.ImageInfo, error) {
 	return p.ListImagesContents, nil
 }
 
-func (p *MockProvider) BuildImage(name string, incoming io.Reader, result io.Writer) (provider.ImageInfo, error) {
-	return provider.ImageInfo{}, nil
+func (p *MockProvider) BuildImage(name string, incoming io.Reader, result io.Writer) (*provider.ImageInfo, error) {
+	p.BuildImageCalled = true
+
+	if p.BuildImageError != nil {
+		return nil, p.BuildImageError
+	}
+
+	result.Write([]byte(p.BuildImageOutput))
+
+	return p.BuildImageReturn, nil
 }
 
 func (p *MockProvider) RemoveImage(imageIdOrName string) error {
+	p.RemoveImageCalled = true
+
+	if p.RemoveImageError != nil {
+		return p.RemoveImageError
+	}
+
 	return nil
 }
 
-func (p *MockProvider) PullImage(location string) (provider.ImageInfo, error) {
-	return provider.ImageInfo{}, nil
+func (p *MockProvider) PullImage(location string) (*provider.ImageInfo, error) {
+	p.PullImageCalled = true
+
+	if p.PullImageError != nil {
+		return nil, p.PullImageError
+	}
+
+	return p.PullImageReturn, nil
 }
 
 func (p *MockProvider) PushImage(imageIDOrName, location string) error {
+	p.PushImageCalled = true
+
+	if p.PushImageError != nil {
+		return p.PushImageError
+	}
+
 	return nil
 }
 
 func (p *MockProvider) TagImage(imageIDOrName, newName string, force bool) error {
+	p.TagImageCalled = true
+
+	if p.TagImageError != nil {
+		return p.TagImageError
+	}
+
 	return nil
 }
 
