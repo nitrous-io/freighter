@@ -228,6 +228,26 @@ func (p *MockProvider) ListImages() ([]*provider.ImageInfo, error) {
 	return p.ListImagesContents, nil
 }
 
+func (p *MockProvider) BuildImage(name string, incoming io.Reader, result io.Writer) (provider.ImageInfo, error) {
+	return provider.ImageInfo{}, nil
+}
+
+func (p *MockProvider) RemoveImage(imageIdOrName string) error {
+	return nil
+}
+
+func (p *MockProvider) PullImage(location string) (provider.ImageInfo, error) {
+	return provider.ImageInfo{}, nil
+}
+
+func (p *MockProvider) TagImage(imageIDOrName, newName string, force bool) error {
+	return nil
+}
+
+func (p *MockProvider) PushImage(imageIDOrName, location string) error {
+	return nil
+}
+
 func (p *MockProvider) CreateVolume(slug string) (*provider.VolumeInfo, error) {
 	p.CreateVolumeCalled = true
 	p.CreateVolumeSlug = slug
