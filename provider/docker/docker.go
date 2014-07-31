@@ -54,7 +54,7 @@ type DockerProvider struct {
 }
 
 type lookupImageResult struct {
-	MatchingImage provider.ImageInfo
+	MatchingImage *provider.ImageInfo
 	FoundByID     bool
 }
 
@@ -66,7 +66,13 @@ func NewDockerProvider(logger *util.Logger, dataPath, namespace string) (*Docker
 	if err != nil {
 		return nil, err
 	}
-	return &DockerProvider{client: client, dataPath: dataPath, namespace: namespace + ".", logger: logger, DockerClientProxy: client}, nil
+	return &DockerProvider{
+		client:            client,
+		dataPath:          dataPath,
+		namespace:         namespace + ".",
+		logger:            logger,
+		DockerClientProxy: client,
+	}, nil
 }
 
 func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
@@ -96,8 +102,7 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 }
 
 func (p *DockerProvider) Create(name, imageName, configJSON string) (*provider.ContainerInfo, error) {
-	err := p.createAuthorizedKeys(p.namespace+name, []string{})
-
+	err := p.createAuthorizedKeys(p.applyNamespace(name), []string{})
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +113,6 @@ func (p *DockerProvider) Create(name, imageName, configJSON string) (*provider.C
 	}
 
 	container, err := p.createContainer(imageName, name, cfg)
-
 	if err != nil {
 		return nil, err
 	}
@@ -434,26 +438,23 @@ func (p *DockerProvider) ListImages() ([]*provider.ImageInfo, error) {
 }
 
 func (p *DockerProvider) BuildImage(name string, incoming io.Reader, result io.Writer) (*provider.ImageInfo, error) {
-	prefixedName := strings.Join([]string{p.namespace, name}, "")
-
 	buildOptions := dockerclient.BuildImageOptions{
-		Name:         prefixedName,
+		Name:         p.applyNamespace(name),
 		InputStream:  incoming,
 		OutputStream: result,
 	}
 
 	err := p.client.BuildImage(buildOptions)
-
 	if err != nil {
-		return &provider.ImageInfo{}, err
+		return nil, err
 	}
 
 	info, err := p.lookupImage(name)
 	if err != nil {
-		return &provider.ImageInfo{}, err
+		return nil, err
 	}
 
-	return &info.MatchingImage, nil
+	return info.MatchingImage, nil
 }
 
 func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
@@ -462,16 +463,15 @@ func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
 		return err
 	}
 
-	matchingImage, useID := lookupResult.MatchingImage, lookupResult.FoundByID
+	image, useID := lookupResult.MatchingImage, lookupResult.FoundByID
 
 	if useID {
-		err = p.client.RemoveImage(matchingImage.ID)
+		err = p.client.RemoveImage(image.ID)
 	} else {
-		merged := strings.Join([]string{matchingImage.Name, matchingImage.Tag}, ":")
-		fullName := strings.Join([]string{p.namespace, merged}, "")
+		merged := strings.Join([]string{image.Name, image.Tag}, ":")
+		fullName := p.applyNamespace(merged)
 		err = p.client.RemoveImage(fullName)
 	}
-
 	if err != nil && strings.Contains(err.Error(), "tagged in multiple repositories") {
 		return provider.ErrImageShared
 	}
@@ -501,25 +501,21 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 	}
 
 	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
-
 	if err != nil {
 		return &provider.ImageInfo{}, err
 	}
 
-	var buf bytes.Buffer
 	pullOpts := dockerclient.PullImageOptions{
-		Repository:   repository,
-		Tag:          tagToPush,
-		OutputStream: &buf,
+		Repository: repository,
+		Tag:        tagToPush,
 	}
 
 	err = p.DockerClientProxy.PullImage(pullOpts, auth)
-
 	if err != nil {
 		return &provider.ImageInfo{}, err
 	}
 
-	newRepo := strings.Join([]string{p.namespace, repository}, "")
+	newRepo := p.applyNamespace(repository)
 	existingName := strings.Join([]string{repository, tag}, ":")
 	newName := strings.Join([]string{newRepo, tag}, ":")
 
@@ -531,13 +527,11 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 		newName,
 	}
 	err = exec.Command("docker", args...).Run()
-
 	if err != nil {
 		return &provider.ImageInfo{}, err
 	}
 
 	err = p.client.RemoveImage(existingName)
-
 	if err != nil {
 		return &provider.ImageInfo{}, err
 	}
@@ -547,7 +541,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 		return &provider.ImageInfo{}, err
 	}
 
-	return &located.MatchingImage, nil
+	return located.MatchingImage, nil
 }
 
 func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
@@ -579,13 +573,11 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 		finalName,
 	}
 	err = exec.Command("docker", args...).Run()
-
 	if err != nil {
 		return err
 	}
 
 	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
-
 	if err != nil {
 		return err
 	}
@@ -607,7 +599,6 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 		OutputStream: &buf,
 	}
 	err = p.DockerClientProxy.PushImage(pushOpts, auth)
-
 	if err != nil {
 		return err
 	}
@@ -624,7 +615,7 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 	matchingImage := lookupResult.MatchingImage
 
 	repository, tag := extractRepoAndTag(newName)
-	newRepo := strings.Join([]string{p.namespace, repository}, "")
+	newRepo := p.applyNamespace(repository)
 	finalName := strings.Join([]string{newRepo, tag}, ":")
 
 	if !force {
@@ -642,7 +633,6 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 		finalName,
 	}
 	err = exec.Command("docker", args...).Run()
-
 	if err != nil {
 		return err
 	}
@@ -650,9 +640,14 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 	return nil
 }
 
+type authconfig struct {
+	Auth  string `json:"auth"`
+	Email string `json:"email"`
+}
+
 func (p *DockerProvider) fetchAuthenticationInfoBestMatch(registry string) (dockerclient.AuthConfiguration, error) {
-	if len(registry) == 0 {
-		registry = "docker.io"
+	if registry == "" {
+		registry = "https://index.docker.io/v1/"
 	}
 
 	authPath, err := p.dockerConfigLocation()
@@ -665,43 +660,31 @@ func (p *DockerProvider) fetchAuthenticationInfoBestMatch(registry string) (dock
 		return dockerclient.AuthConfiguration{}, err
 	}
 
-	var jsonMap interface{}
-	err = json.Unmarshal(fileContents, &jsonMap)
-
+	var endpointMap map[string]authconfig
+	err = json.Unmarshal(fileContents, &endpointMap)
 	if err != nil {
 		return dockerclient.AuthConfiguration{}, err
 	}
 
-	endpointMap := jsonMap.(map[string]interface{})
-
-	for registryEndpoint, authMap := range endpointMap {
-		if strings.Contains(registryEndpoint, registry) {
-			authDetails := authMap.(map[string]interface{})
-
-			auth, found := authDetails["auth"]
-			if !found {
+	for endpoint, authconfig := range endpointMap {
+		if strings.Contains(endpoint, registry) {
+			if authconfig.Auth == "" {
 				return dockerclient.AuthConfiguration{}, provider.ErrImageAuthMisconfigured
 			}
-			email, found := authDetails["email"]
-			if !found {
-				return dockerclient.AuthConfiguration{}, provider.ErrImageAuthMisconfigured
-			}
-
-			authBase := auth.(string)
-			authEmail := email.(string)
-
-			decodedBase, err := base64.StdEncoding.DecodeString(authBase)
+			decoded, err := base64.StdEncoding.DecodeString(authconfig.Auth)
 			if err != nil {
 				return dockerclient.AuthConfiguration{}, err
 			}
-			authParams := strings.Split(string(decodedBase), ":")
+			authParams := strings.Split(string(decoded), ":")
+			if len(authParams) != 2 {
+				return dockerclient.AuthConfiguration{}, provider.ErrImageAuthMisconfigured
+			}
 			user, password := authParams[0], authParams[1]
-			authConf := dockerclient.AuthConfiguration{
+			return dockerclient.AuthConfiguration{
 				Username: user,
 				Password: password,
-				Email:    authEmail,
-			}
-			return authConf, nil
+				Email:    authconfig.Email,
+			}, nil
 		}
 	}
 
@@ -737,15 +720,15 @@ func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, e
 	var repository, tag string
 	for _, image := range availableImages {
 		if image.ID == imageIDOrName {
-			return lookupImageResult{MatchingImage: *image, FoundByID: true}, nil
+			return lookupImageResult{MatchingImage: image, FoundByID: true}, nil
 		} else {
 			// break up parts, only when we truly need to
-			if len(repository) == 0 {
+			if repository == "" {
 				repository, tag = extractRepoAndTag(imageIDOrName)
 			}
 
 			if repository == image.Name && tag == image.Tag {
-				return lookupImageResult{MatchingImage: *image}, nil
+				return lookupImageResult{MatchingImage: image}, nil
 			}
 		}
 	}
@@ -762,12 +745,11 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 		Repository: repository,
 		Tag:        tag,
 	}, dockerclient.AuthConfiguration{})
-
 	if err != nil {
 		return nil, err
 	}
 
-	containerName = p.namespace + containerName
+	containerName = p.applyNamespace(containerName)
 
 	createConfig, startConfig, err := p.createConfigs(containerName, imageName, config)
 	if err != nil {
@@ -778,7 +760,6 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 		Name:   containerName,
 		Config: createConfig,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -863,6 +844,10 @@ func (p *DockerProvider) inspectContainer(id string) (*dockerclient.Container, e
 		return nil, &dockerclient.NoSuchContainer{ID: id}
 	}
 	return container, nil
+}
+
+func (p *DockerProvider) applyNamespace(name string) string {
+	return p.namespace + name
 }
 
 func nameFromContainer(container *dockerclient.Container) string {

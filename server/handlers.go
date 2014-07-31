@@ -394,7 +394,7 @@ func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) {
 	info, err := s.provider.BuildImage(name, fn, &buildBuffer)
 	if err != nil {
 		output := buildBuffer.String()
-		if len(output) == 0 {
+		if output == "" {
 			s.handleError(w, err)
 		} else {
 			s.respondEncodeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": err.Error(), "output": output})

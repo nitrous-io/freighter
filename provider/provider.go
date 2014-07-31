@@ -46,7 +46,7 @@ type Provider interface {
 
 	ListImages() (infoList []*ImageInfo, err error)
 	BuildImage(name string, incoming io.Reader, result io.Writer) (*ImageInfo, error)
-	RemoveImage(imageIdOrName string) error
+	RemoveImage(imageIDOrName string) error
 	PullImage(location string) (*ImageInfo, error)
 	PushImage(imageIDOrName, location string) error
 	TagImage(imageIDOrName, newName string, force bool) error
