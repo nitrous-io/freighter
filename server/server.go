@@ -82,6 +82,7 @@ func (s *Server) drawRoutes() {
 	s.route("/images/pull", s.wrapError(s.pullImage), "POST")
 	s.route("/images/{slug}/push", s.wrapError(s.pushImage), "POST")
 	s.route("/images/{slug}/tag", s.wrapError(s.tagImage), "POST")
+	s.route("/images/{slug}/export", s.wrapError(s.exportImage), "GET")
 
 	// volumes
 	s.route("/volumes", s.wrapError(s.listVolumes), "GET")

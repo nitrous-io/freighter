@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -17,6 +18,7 @@ import (
 	"github.com/nitrous-io/freighter/pkg/shell"
 	"github.com/nitrous-io/freighter/pkg/stats"
 	"github.com/nitrous-io/freighter/provider"
+	"github.com/nitrous-io/freighter/provider/docker"
 )
 
 const StatusUnprocessableEntity = 422
@@ -449,6 +451,21 @@ func (s *Server) tagImage(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.respond(w, http.StatusOK, jsonStatusOK)
+	return nil
+}
+
+func (s *Server) exportImage(w http.ResponseWriter, r *http.Request) error {
+	prov, ok := s.provider.(*docker.DockerProvider)
+	if !ok {
+		return errors.New("Provider does not support export image.")
+	}
+
+	slug := mux.Vars(r)["slug"]
+	w.Header().Set("Content-Type", "application/octet-stream")
+	err := prov.ExportImage(slug, w)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

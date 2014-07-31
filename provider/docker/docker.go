@@ -611,6 +611,27 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 	return nil
 }
 
+func (p *DockerProvider) ExportImage(imageIDOrName string, out io.Writer) error {
+	lookupResult, err := p.lookupImage(imageIDOrName)
+	if err != nil {
+		return err
+	}
+	image := lookupResult.MatchingImage
+
+	args := []string{
+		"save",
+		image.Name,
+	}
+	cmd := exec.Command("docker", args...)
+	cmd.Stdout = out
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type authconfig struct {
 	Auth  string `json:"auth"`
 	Email string `json:"email"`
