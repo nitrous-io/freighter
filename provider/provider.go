@@ -21,6 +21,7 @@ var (
 	ErrImageTagExists         = errors.New("Image with same tag already exists")
 	ErrImageAuthNotAllowed    = errors.New("Do not have permission to push/pull image")
 	ErrImageAuthMisconfigured = errors.New("Image registry configuration invalid")
+	ErrImagePushAuthRequired  = errors.New("Log in to the registry before pushing an image to it")
 )
 
 type Provider interface {

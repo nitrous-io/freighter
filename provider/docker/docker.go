@@ -553,6 +553,10 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 	if err != nil {
 		return err
 	}
+	if auth == (dockerclient.AuthConfiguration{}) {
+		// docker push requires logging in to the registry first.
+		return provider.ErrImagePushAuthRequired
+	}
 
 	var buf bytes.Buffer
 	// while PushImageOptions contains a Registry attribute, it does not work
@@ -619,7 +623,7 @@ func (p *DockerProvider) fetchAuthenticationInfoBestMatch(registry string) (dock
 
 	authPath, err := p.dockerConfigLocation()
 	if err != nil {
-		return dockerclient.AuthConfiguration{}, provider.ErrImageAuthMisconfigured
+		return dockerclient.AuthConfiguration{}, nil
 	}
 
 	fileContents, err := ioutil.ReadFile(authPath)
@@ -636,7 +640,7 @@ func (p *DockerProvider) fetchAuthenticationInfoBestMatch(registry string) (dock
 	for endpoint, authconfig := range endpointMap {
 		if strings.Contains(endpoint, registry) {
 			if authconfig.Auth == "" {
-				return dockerclient.AuthConfiguration{}, provider.ErrImageAuthMisconfigured
+				return dockerclient.AuthConfiguration{}, nil
 			}
 			decoded, err := base64.StdEncoding.DecodeString(authconfig.Auth)
 			if err != nil {
@@ -655,7 +659,7 @@ func (p *DockerProvider) fetchAuthenticationInfoBestMatch(registry string) (dock
 		}
 	}
 
-	return dockerclient.AuthConfiguration{}, provider.ErrImageAuthNotAllowed
+	return dockerclient.AuthConfiguration{}, nil
 }
 
 func (p *DockerProvider) dockerConfigLocation() (string, error) {

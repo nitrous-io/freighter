@@ -1205,13 +1205,6 @@ var _ = Describe("provider/docker", func() {
 			tempAuthFile.Close()
 		})
 
-		It("should handle if auth credentials could not be located", func() {
-			info, err := prov.PullImage("cloudy.io/nodejs")
-			Expect(err).To(Equal(provider.ErrImageAuthNotAllowed))
-			Expect(info).To(BeNil())
-			Expect(mockProxy.PullImageCalled).To(BeFalse())
-		})
-
 		It("should allow for importing by default hub", func() {
 			mockProxy.PullImageCallBack = func() {
 				createBasicImage("nitrousio/nodejs")
@@ -1282,14 +1275,27 @@ var _ = Describe("provider/docker", func() {
 			checkImageRenamed("quay.io/quay/ubuntu:latest")
 		})
 
-		It("should handle a malformed config", func() {
-			_, err := prov.PullImage("magic.io/quay/ubuntu")
-			Expect(err).To(Equal(provider.ErrImageAuthMisconfigured))
-
-			Expect(mockProxy.PullImageCalled).To(BeFalse())
+		It("should allow even when auth credentials could not be located", func() {
+			mockProxy.PullImageCallBack = func() {
+				createBasicImage("cloudy.io/nodejs")
+			}
+			info, err := prov.PullImage("cloudy.io/nodejs")
+			Expect(err).To(BeNil())
+			Expect(info).NotTo(BeNil())
+			Expect(mockProxy.PullImageCalled).To(BeTrue())
+			Expect(mockProxy.PullImageAuth).To(Equal(dockerclient.AuthConfiguration{}))
 		})
 
-		It("should surface PushImage errors", func() {
+		It("should allow even a malformed config", func() {
+			mockProxy.PullImageError = errors.New("Forbidden")
+			info, err := prov.PullImage("magic.io/quay/ubuntu")
+			Expect(err).To(Equal(errors.New("Forbidden")))
+			Expect(info).To(BeNil())
+			Expect(mockProxy.PullImageCalled).To(BeTrue())
+			Expect(mockProxy.PullImageAuth).To(Equal(dockerclient.AuthConfiguration{}))
+		})
+
+		It("should surface PullImage errors", func() {
 			sharedErr := errors.New("Sorry!")
 			mockProxy.PullImageError = sharedErr
 			_, err := prov.PullImage("quay/ubuntu")
@@ -1410,7 +1416,7 @@ var _ = Describe("provider/docker", func() {
 				tempAuthFile, err = ioutil.TempFile("", "cfg")
 				Expect(err).To(BeNil())
 
-				/* credientials are
+				/* credentials are
 				test:1234xxcc
 				testo:Password1
 				magic:abc34x1
@@ -1449,7 +1455,7 @@ var _ = Describe("provider/docker", func() {
 			It("should handle if auth credentials could not be located", func() {
 				created := createImages(1, "namely", false, false, false)
 				err := prov.PushImage(withoutNamespace(created[0]), "thingyquay.io/callumj/test1")
-				Expect(err).To(Equal(provider.ErrImageAuthNotAllowed))
+				Expect(err).To(Equal(provider.ErrImagePushAuthRequired))
 
 				Expect(mockProxy.PushImageCalled).To(BeFalse())
 
@@ -1511,7 +1517,7 @@ var _ = Describe("provider/docker", func() {
 			It("should handle a malformed config", func() {
 				created := createImages(1, "namely", false, false, false)
 				err := prov.PushImage(withoutNamespace(created[0]), "magic.io/callumj/test1")
-				Expect(err).To(Equal(provider.ErrImageAuthMisconfigured))
+				Expect(err).To(Equal(provider.ErrImagePushAuthRequired))
 
 				Expect(mockProxy.PushImageCalled).To(BeFalse())
 
