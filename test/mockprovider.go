@@ -204,7 +204,6 @@ func (p *MockProvider) Export(id string, output io.Writer) error {
 	p.ExportCalled = true
 	p.ReceivedID = id
 	p.ReceivedIOWriter = output
-
 	return p.ExportError
 }
 
@@ -258,44 +257,24 @@ func (p *MockProvider) BuildImage(name string, incoming io.Reader, result io.Wri
 	return p.BuildImageReturn, nil
 }
 
-func (p *MockProvider) RemoveImage(imageIdOrName string) error {
+func (p *MockProvider) RemoveImage(imageIDOrName string) error {
 	p.RemoveImageCalled = true
-
-	if p.RemoveImageError != nil {
-		return p.RemoveImageError
-	}
-
-	return nil
+	return p.RemoveImageError
 }
 
 func (p *MockProvider) PullImage(location string) (*provider.ImageInfo, error) {
 	p.PullImageCalled = true
-
-	if p.PullImageError != nil {
-		return nil, p.PullImageError
-	}
-
-	return p.PullImageReturn, nil
+	return p.PullImageReturn, p.PullImageError
 }
 
 func (p *MockProvider) PushImage(imageIDOrName, location string) error {
 	p.PushImageCalled = true
-
-	if p.PushImageError != nil {
-		return p.PushImageError
-	}
-
-	return nil
+	return p.PushImageError
 }
 
 func (p *MockProvider) TagImage(imageIDOrName, newName string, force bool) error {
 	p.TagImageCalled = true
-
-	if p.TagImageError != nil {
-		return p.TagImageError
-	}
-
-	return nil
+	return p.TagImageError
 }
 
 func (p *MockProvider) CreateVolume(slug string) (*provider.VolumeInfo, error) {
