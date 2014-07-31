@@ -65,6 +65,7 @@ type MockClient struct {
 	ReceivedID     string
 	ReceivedName   string
 	ReceivedImage  string
+	ReceivedTag    string
 	ReceivedConfig *ContainerConfig
 
 	ReceivedUsername string
@@ -81,6 +82,20 @@ type MockClient struct {
 	BuildImageError  error
 	BuildImageName   string
 	BuildImagePath   string
+
+	RemoveImageCalled int
+	RemoveImageError  error
+
+	PullImageCalled int
+	PullImageReturn *Image
+	PullImageError  error
+
+	PushImageCalled int
+	PushImageError  error
+
+	TagImageCalled int
+	TagImageForce  bool
+	TagImageError  error
 }
 
 func (c *MockClient) List() ([]*Container, error) {
@@ -246,4 +261,31 @@ func (c *MockClient) BuildImage(h *Host, name, path string) (*Image, error) {
 	c.BuildImagePath = path
 
 	return c.BuildImageReturn, c.BuildImageError
+}
+
+func (c *MockClient) RemoveImage(h *Host, slug string) error {
+	c.RemoveImageCalled = c.RemoveImageCalled + 1
+
+	return c.RemoveImageError
+}
+
+func (c *MockClient) PullImage(h *Host, location string) (*Image, error) {
+	c.PullImageCalled = c.PullImageCalled + 1
+
+	return c.PullImageReturn, c.PullImageError
+}
+
+func (c *MockClient) PushImage(h *Host, slug, location string) error {
+	c.PushImageCalled = c.PushImageCalled + 1
+
+	return c.PushImageError
+}
+
+func (c *MockClient) TagImage(h *Host, slug, newName string, force bool) error {
+	c.TagImageCalled = c.TagImageCalled + 1
+	c.ReceivedImage = slug
+	c.ReceivedTag = newName
+	c.TagImageForce = force
+
+	return c.TagImageError
 }

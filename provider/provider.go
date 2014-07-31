@@ -47,10 +47,10 @@ type Provider interface {
 
 	ListImages() (infoList []*ImageInfo, err error)
 	BuildImage(name string, incoming io.Reader, result io.Writer) (*ImageInfo, error)
-	RemoveImage(imageIDOrName string) error
+	RemoveImage(slug string) error
 	PullImage(location string) (*ImageInfo, error)
-	PushImage(imageIDOrName, location string) error
-	TagImage(imageIDOrName, newName string, force bool) error
+	PushImage(slug, location string) error
+	TagImage(slug, newName string, force bool) error
 
 	CreateVolume(slug string) (*VolumeInfo, error)
 	ListVolumes() ([]string, error)

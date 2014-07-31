@@ -1379,17 +1379,8 @@ var _ = Describe("client", func() {
 				os.Remove(filename)
 			})
 
-			Context("parsing body", func() {
-				It("should handle JSON decoding errors", func() {
-					statusCode = http.StatusOK
-					responseBody = `<<???>>`
-
-					image, err := client.BuildImage(host, "myimage:tag", filename)
-					Expect(err).To(Equal(freighterclient.ErrUnexpectedResponse))
-					Expect(image).To(BeNil())
-				})
-
-				It("should be capable of extracting an Image response", func() {
+			Context("Successful Response", func() {
+				BeforeEach(func() {
 					statusCode = http.StatusOK
 					responseBody = `{
 						"image": {
@@ -1402,7 +1393,9 @@ var _ = Describe("client", func() {
 						},
 						"output": "image build output"
 					}`
+				})
 
+				It("should be capable of extracting an Image response", func() {
 					image, err := client.BuildImage(host, "myimage:tag", filename)
 					Expect(err).To(BeNil())
 
@@ -1414,6 +1407,20 @@ var _ = Describe("client", func() {
 						ActualSize:  12,
 						VirtualSize: 39,
 					}))
+				})
+			})
+
+			Context("Error Response - JSON Parsing Error", func() {
+				BeforeEach(func() {
+					statusCode = http.StatusOK
+					responseBody = `<<???>>`
+				})
+
+				It("should handle JSON decoding errors", func() {
+
+					image, err := client.BuildImage(host, "myimage:tag", filename)
+					Expect(err).To(Equal(freighterclient.ErrUnexpectedResponse))
+					Expect(image).To(BeNil())
 				})
 			})
 
@@ -1438,26 +1445,212 @@ var _ = Describe("client", func() {
 			})
 		})
 
-		Describe("ListImages()", func() {
-			Context("parsing body", func() {
+		Describe("RemoveImage()", func() {
+			BeforeEach(func() {
+				setupServer("DELETE", "/images/imageid", "application/x-www-form-urlencoded")
+			})
+
+			AfterEach(func() {
+				teardownServer()
+			})
+
+			Context("Successful response", func() {
 				BeforeEach(func() {
-					setupServer("GET", "/images", "application/json")
+					statusCode = http.StatusOK
 				})
 
-				AfterEach(func() {
-					st.Close()
+				It("should return nil error", func() {
+					err := client.RemoveImage(host, "imageid")
+					Expect(err).To(BeNil())
+				})
+			})
+
+			Context("Error Response - with failures communicating with endpoint", func() {
+				It("should surface request failures", func() {
+					teardownServer()
+
+					err := client.RemoveImage(host, "imageid")
+					Expect(err).NotTo(BeNil())
+					_, ok := err.(*freighterclient.RequestFailedError)
+					Expect(ok).To(BeTrue())
+					Expect(server.ReceivedRequests()).To(HaveLen(0))
+				})
+
+				It("should surface response failures in StatusErr", func() {
+					statusCode = http.StatusInternalServerError
+					err := client.RemoveImage(host, "imageid")
+
+					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
+				})
+			})
+		})
+
+		Describe("PushImage()", func() {
+			BeforeEach(func() {
+				setupServer("POST", "/images/push", "application/x-www-form-urlencoded")
+			})
+
+			AfterEach(func() {
+				teardownServer()
+			})
+
+			Context("Successful response", func() {
+				BeforeEach(func() {
+					statusCode = http.StatusOK
+				})
+
+				It("should return nil error", func() {
+					err := client.PushImage(host, "imageid", "hub.docker.com")
+					Expect(err).To(BeNil())
+				})
+			})
+
+			Context("Error Response - with failures communicating with endpoint", func() {
+				It("should surface request failures", func() {
+					teardownServer()
+
+					err := client.PushImage(host, "imageid", "hub.docker.com")
+					Expect(err).NotTo(BeNil())
+					_, ok := err.(*freighterclient.RequestFailedError)
+					Expect(ok).To(BeTrue())
+					Expect(server.ReceivedRequests()).To(HaveLen(0))
+				})
+
+				It("should surface response failures in StatusErr", func() {
+					statusCode = http.StatusInternalServerError
+					err := client.PushImage(host, "imageid", "hub.docker.com")
+
+					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
+				})
+			})
+		})
+
+		Describe("TagImage()", func() {
+			BeforeEach(func() {
+				setupServer("POST", "/images/tag", "application/x-www-form-urlencoded")
+			})
+
+			AfterEach(func() {
+				teardownServer()
+			})
+
+			Context("Successful response", func() {
+				BeforeEach(func() {
+					statusCode = http.StatusOK
+				})
+
+				It("should return nil error", func() {
+					err := client.TagImage(host, "imageid", "mytag", true)
+					Expect(err).To(BeNil())
+				})
+			})
+
+			Context("Error Response - with failures communicating with endpoint", func() {
+				It("should surface request failures", func() {
+					teardownServer()
+
+					err := client.TagImage(host, "imageid", "mytag", true)
+					Expect(err).NotTo(BeNil())
+					_, ok := err.(*freighterclient.RequestFailedError)
+					Expect(ok).To(BeTrue())
+					Expect(server.ReceivedRequests()).To(HaveLen(0))
+				})
+
+				It("should surface response failures in StatusErr", func() {
+					statusCode = http.StatusInternalServerError
+					err := client.TagImage(host, "imageid", "mytag", true)
+
+					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
+				})
+			})
+		})
+
+		Describe("PullImage", func() {
+			BeforeEach(func() {
+				setupServer("POST", "/images/pull", "application/x-www-form-urlencoded")
+			})
+
+			AfterEach(func() {
+				teardownServer()
+			})
+
+			Context("Successful response", func() {
+				BeforeEach(func() {
+					statusCode = http.StatusOK
+					responseBody = `{
+						"image": {
+							"id": "12",
+							"name": "myimage",
+							"tag": "tag",
+							"created_at": 1902,
+							"actual_size": 12,
+							"virtual_size": 39
+						},
+						"output": "image build output"
+					}`
+				})
+
+				It("should return nil error", func() {
+					image, err := client.PullImage(host, "myimage:tag")
+					Expect(err).To(BeNil())
+
+					Expect(image).To(Equal(&freighterclient.Image{
+						ID:          "12",
+						Name:        "myimage",
+						Tag:         "tag",
+						CreatedAt:   1902,
+						ActualSize:  12,
+						VirtualSize: 39,
+					}))
+				})
+			})
+
+			Context("Error Response - JSON parsing error", func() {
+				BeforeEach(func() {
+					statusCode = http.StatusOK
+					responseBody = `<<???>>`
 				})
 
 				It("should handle JSON decoding errors", func() {
-					statusCode = http.StatusOK
-					responseBody = `<<???>>`
-
-					images, err := cl.ListImages()
+					image, err := client.PullImage(host, "myimage:tag")
 					Expect(err).To(Equal(freighterclient.ErrUnexpectedResponse))
-					Expect(images).To(BeNil())
+					Expect(image).To(BeNil())
+				})
+			})
+
+			Context("Error Response - with failures communicating with endpoint", func() {
+				It("should surface request failures", func() {
+					teardownServer()
+
+					image, err := client.PullImage(host, "myimage:tag")
+					Expect(err).NotTo(BeNil())
+					Expect(image).To(BeNil())
+					_, ok := err.(*freighterclient.RequestFailedError)
+					Expect(ok).To(BeTrue())
+					Expect(server.ReceivedRequests()).To(HaveLen(0))
 				})
 
-				It("should be capable of extracting an Images response", func() {
+				It("should surface response failures in StatusErr", func() {
+					statusCode = http.StatusInternalServerError
+					image, err := client.PullImage(host, "myimage:tag")
+
+					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
+					Expect(image).To(BeNil())
+				})
+			})
+		})
+
+		Describe("ListImages()", func() {
+			BeforeEach(func() {
+				setupServer("GET", "/images", "application/json")
+			})
+
+			AfterEach(func() {
+				teardownServer()
+			})
+
+			Context("Successful Response", func() {
+				BeforeEach(func() {
 					statusCode = http.StatusOK
 					responseBody = `{
 						"images": [
@@ -1480,8 +1673,10 @@ var _ = Describe("client", func() {
 							}
 						]
 					}`
+				})
 
-					images, err := cl.ListImages()
+				It("should be capable of extracting an Images response", func() {
+					images, err := client.ListImages(host)
 					Expect(err).To(BeNil())
 					Expect(images).To(HaveLen(2))
 
@@ -1505,15 +1700,20 @@ var _ = Describe("client", func() {
 				})
 			})
 
-			Context("with failures communicating with endpoint", func() {
+			Context("Error Response - JSON decoding Errors", func() {
 				BeforeEach(func() {
-					setupServer("GET", "/images", "application/json")
+					statusCode = http.StatusOK
+					responseBody = `<<???>>`
 				})
 
-				AfterEach(func() {
-					teardownServer()
+				It("should handle JSON decoding errors", func() {
+					images, err := client.ListImages(host)
+					Expect(err).To(Equal(freighterclient.ErrUnexpectedResponse))
+					Expect(images).To(BeNil())
 				})
+			})
 
+			Context("Error Response - failures communicating with endpoint", func() {
 				It("should surface request failures", func() {
 					teardownServer()
 
@@ -1533,7 +1733,6 @@ var _ = Describe("client", func() {
 					Expect(images).To(BeNil())
 				})
 			})
-
 		})
 	})
 })

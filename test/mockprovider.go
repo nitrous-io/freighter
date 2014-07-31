@@ -258,7 +258,7 @@ func (p *MockProvider) BuildImage(name string, incoming io.Reader, result io.Wri
 	return p.BuildImageReturn, nil
 }
 
-func (p *MockProvider) RemoveImage(imageIDOrName string) error {
+func (p *MockProvider) RemoveImage(slug string) error {
 	p.RemoveImageCalled = true
 	return p.RemoveImageError
 }
@@ -269,12 +269,12 @@ func (p *MockProvider) PullImage(location string) (*provider.ImageInfo, error) {
 	return p.PullImageReturn, p.PullImageError
 }
 
-func (p *MockProvider) PushImage(imageIDOrName, location string) error {
+func (p *MockProvider) PushImage(slug, location string) error {
 	p.PushImageCalled = true
 	return p.PushImageError
 }
 
-func (p *MockProvider) TagImage(imageIDOrName, newName string, force bool) error {
+func (p *MockProvider) TagImage(slug, newName string, force bool) error {
 	p.TagImageCalled = true
 	return p.TagImageError
 }
