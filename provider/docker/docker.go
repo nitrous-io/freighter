@@ -19,6 +19,7 @@ import (
 
 	dockerclient "github.com/fsouza/go-dockerclient"
 	"github.com/nitrous-io/freighter/provider"
+	"github.com/nitrous-io/freighter/provider/docker/parsers"
 	"github.com/nitrous-io/freighter/util"
 )
 
@@ -480,14 +481,7 @@ func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
 }
 
 func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error) {
-	repository, tag := extractRepoAndTag(location)
-
-	var tagToPush string
-	if tag == "latest" && strings.HasSuffix(location, ":latest") {
-		tagToPush = "latest"
-	} else if tag != "latest" {
-		tagToPush = tag
-	}
+	repository, tag := parsers.ParseRepoAndTag(location)
 
 	splits := strings.Split(location, "/")
 	var registry string
@@ -507,7 +501,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 
 	pullOpts := dockerclient.PullImageOptions{
 		Repository: repository,
-		Tag:        tagToPush,
+		Tag:        tag,
 	}
 
 	err = p.DockerClientProxy.PullImage(pullOpts, auth)
@@ -563,7 +557,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 		}
 	}
 
-	repository, tag := extractRepoAndTag(location)
+	repository, tag := parsers.ParseRepoAndTag(location)
 
 	finalName := strings.Join([]string{repository, tag}, ":")
 	args := []string{
@@ -583,19 +577,11 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 	}
 
 	var buf bytes.Buffer
-
-	var tagToPush string
-	if tag == "latest" && strings.HasSuffix(location, ":latest") {
-		tagToPush = "latest"
-	} else if tag != "latest" {
-		tagToPush = tag
-	}
-
 	// while PushImageOptions contains a Registry attribute, it does not work
 	// docker push XXXXXX calls the API with the full name (registry and repository) as the image name
 	pushOpts := dockerclient.PushImageOptions{
 		Name:         repository,
-		Tag:          tagToPush,
+		Tag:          tag,
 		OutputStream: &buf,
 	}
 	err = p.DockerClientProxy.PushImage(pushOpts, auth)
@@ -614,7 +600,10 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 
 	matchingImage := lookupResult.MatchingImage
 
-	repository, tag := extractRepoAndTag(newName)
+	repository, tag := parsers.ParseRepoAndTag(newName)
+	if tag == "" {
+		tag = "latest"
+	}
 	newRepo := p.applyNamespace(repository)
 	finalName := strings.Join([]string{newRepo, tag}, ":")
 
@@ -724,7 +713,10 @@ func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, e
 		} else {
 			// break up parts, only when we truly need to
 			if repository == "" {
-				repository, tag = extractRepoAndTag(imageIDOrName)
+				repository, tag = parsers.ParseRepoAndTag(imageIDOrName)
+				if tag == "" {
+					tag = "latest"
+				}
 			}
 
 			if repository == image.Name && tag == image.Tag {
@@ -740,7 +732,10 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 	p.logger.Info("DockerProvider: creating container", containerName, "with image", imageName)
 	start := time.Now()
 
-	repository, tag := extractRepoAndTag(imageName)
+	repository, tag := parsers.ParseRepoAndTag(imageName)
+	if tag == "" {
+		tag = "latest"
+	}
 	err := p.client.PullImage(dockerclient.PullImageOptions{
 		Repository: repository,
 		Tag:        tag,
@@ -787,20 +782,6 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 
 	p.logger.TimeInfo(start, "DockerProvider: started container", containerName, id, "in")
 	return container, err
-}
-
-func extractRepoAndTag(imageName string) (string, string) {
-	parts := strings.Split(imageName, ":")
-	var repository, tag string
-	repository = parts[0]
-
-	if len(parts) == 1 {
-		tag = "latest"
-	} else {
-		tag = parts[1]
-	}
-
-	return repository, tag
 }
 
 func (p *DockerProvider) containerSettingsDir(containerName string) string {
