@@ -1,15 +1,19 @@
 package freighterclient
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -86,6 +90,7 @@ type Client interface {
 	HostInfo() (*HostInfo, error)
 
 	ListImages() ([]*Image, error)
+	BuildImage(host *Host, name string, path string) (*Image, error)
 }
 
 type (
@@ -572,6 +577,54 @@ func (c *client) ListImages() ([]*Image, error) {
 	}
 
 	return images.Images, nil
+}
+
+func (c *client) BuildImage(h *Host, name string, path string) (*Image, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	u := fmt.Sprintf("%s/images", h.BaseURL())
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filepath.Base(path))
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return nil, err
+	}
+	_ = writer.WriteField("name", name)
+
+	req, err := http.NewRequest("POST", u, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := performRequest(c, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, &StatusError{resp.StatusCode}
+	}
+
+	var imageInfo struct {
+		Image  *Image `json:"image"`
+		output string `json:"output"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&imageInfo)
+	if err != nil {
+		return nil, ErrUnexpectedResponse
+	}
+
+	return imageInfo.Image, nil
 }
 
 func (c *client) ListVolumes() ([]string, error) {

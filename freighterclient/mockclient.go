@@ -75,6 +75,12 @@ type MockClient struct {
 	ListImagesCalled int
 	ListImagesArray  []*Image
 	ListImagesError  error
+
+	BuildImageCalled int
+	BuildImageReturn *Image
+	BuildImageError  error
+	BuildImageName   string
+	BuildImagePath   string
 }
 
 func (c *MockClient) List() ([]*Container, error) {
@@ -232,4 +238,12 @@ func (c *MockClient) ListImages() ([]*Image, error) {
 	c.ListImagesCalled = c.ListImagesCalled + 1
 
 	return c.ListImagesArray, c.ListImagesError
+}
+
+func (c *MockClient) BuildImage(h *Host, name, path string) (*Image, error) {
+	c.BuildImageCalled = c.BuildImageCalled + 1
+	c.BuildImageName = name
+	c.BuildImagePath = path
+
+	return c.BuildImageReturn, c.BuildImageError
 }
