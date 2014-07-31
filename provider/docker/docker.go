@@ -483,7 +483,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 	registry := parsers.ParseRegistry(location)
 	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
 	if err != nil {
-		return &provider.ImageInfo{}, err
+		return nil, err
 	}
 
 	repository, tag := parsers.ParseRepoAndTag(location)
@@ -494,7 +494,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 
 	err = p.DockerClientProxy.PullImage(pullOpts, auth)
 	if err != nil {
-		return &provider.ImageInfo{}, err
+		return nil, err
 	}
 
 	newRepo := p.applyNamespace(repository)
@@ -510,17 +510,17 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 	}
 	err = exec.Command("docker", args...).Run()
 	if err != nil {
-		return &provider.ImageInfo{}, err
+		return nil, err
 	}
 
 	err = p.client.RemoveImage(existingName)
 	if err != nil {
-		return &provider.ImageInfo{}, err
+		return nil, err
 	}
 
 	located, err := p.lookupImage(strings.TrimPrefix(newName, p.namespace))
 	if err != nil {
-		return &provider.ImageInfo{}, err
+		return nil, err
 	}
 
 	return located.MatchingImage, nil
