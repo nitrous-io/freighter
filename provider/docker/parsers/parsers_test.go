@@ -37,4 +37,27 @@ var _ = Describe("parsers", func() {
 			})
 		}
 	})
+
+	Describe("ParseRegistry", func() {
+		testCases := []struct {
+			input, expected string
+		}{
+			{input: "ubuntu", expected: ""},
+			{input: "ubuntu:14.04", expected: ""},
+			{input: "nitrousio/ubuntu", expected: ""},
+			{input: "nitrousio/ubuntu:latest", expected: ""},
+			{input: "example.com/ubuntu", expected: "example.com"},
+			{input: "example.com:5000/ubuntu", expected: "example.com:5000"},
+			{input: "example.com:5000/ubuntu:latest", expected: "example.com:5000"},
+			{input: "example.com:5000/nitrousio/ubuntu", expected: "example.com:5000"},
+			{input: "example.com:5000/nitrousio/ubuntu:14.04", expected: "example.com:5000"},
+		}
+		for _, tc2 := range testCases {
+			tc := tc2
+			It(fmt.Sprintf("extracts registry host %#v from %#v", tc.expected, tc.input), func() {
+				registry := parsers.ParseRegistry(tc.input)
+				Expect(registry).To(Equal(tc.expected))
+			})
+		}
+	})
 })

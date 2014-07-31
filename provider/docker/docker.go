@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"os/user"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -481,24 +480,13 @@ func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
 }
 
 func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error) {
-	repository, tag := parsers.ParseRepoAndTag(location)
-
-	splits := strings.Split(location, "/")
-	var registry string
-	if len(splits) >= 3 {
-		registry = splits[0]
-	} else if len(splits) == 2 {
-		isRegistry, _ := regexp.MatchString("[^.]\\.[^.]", splits[0])
-		if isRegistry {
-			registry = splits[0]
-		}
-	}
-
+	registry := parsers.ParseRegistry(location)
 	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
 	if err != nil {
 		return &provider.ImageInfo{}, err
 	}
 
+	repository, tag := parsers.ParseRepoAndTag(location)
 	pullOpts := dockerclient.PullImageOptions{
 		Repository: repository,
 		Tag:        tag,
@@ -546,17 +534,6 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 
 	matchingImage, _ := lookupResult.MatchingImage, lookupResult.FoundByID
 
-	splits := strings.Split(location, "/")
-	var registry string
-	if len(splits) >= 3 {
-		registry = splits[0]
-	} else if len(splits) == 2 {
-		isRegistry, _ := regexp.MatchString("[^.]\\.[.^]", splits[0])
-		if isRegistry {
-			registry = splits[0]
-		}
-	}
-
 	repository, tag := parsers.ParseRepoAndTag(location)
 
 	finalName := strings.Join([]string{repository, tag}, ":")
@@ -571,6 +548,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 		return err
 	}
 
+	registry := parsers.ParseRegistry(location)
 	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
 	if err != nil {
 		return err
