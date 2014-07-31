@@ -1000,7 +1000,7 @@ var _ = Describe("provider/docker", func() {
 			outputBuffer := new(bytes.Buffer)
 			info, err := prov.BuildImage("myimage", readBuf, outputBuffer)
 			Expect(err).To(BeNil())
-			Expect(info.ID).ToNot(HaveLen(0))
+			Expect(info).ToNot(BeNil())
 
 			Expect(outputBuffer.String()).To(ContainSubstring("Successfully built"))
 
@@ -1012,8 +1012,8 @@ var _ = Describe("provider/docker", func() {
 			outputBuffer := new(bytes.Buffer)
 			info, err := prov.BuildImage("myimage", readBuf, outputBuffer)
 			Expect(err).To(BeNil())
+			Expect(info).ToNot(BeNil())
 
-			Expect(info.ID).ToNot(HaveLen(0))
 			allImages, err := prov.ListImages()
 			Expect(err).To(BeNil())
 
@@ -1169,7 +1169,7 @@ var _ = Describe("provider/docker", func() {
 			tempAuthFile, err = ioutil.TempFile("", "cfg")
 			Expect(err).To(BeNil())
 
-			/* credientials are
+			/* credentials are
 			test:1234xxcc
 			testo:Password1
 			magic:abc34x1
@@ -1208,7 +1208,7 @@ var _ = Describe("provider/docker", func() {
 		It("should handle if auth credentials could not be located", func() {
 			info, err := prov.PullImage("cloudy.io/nodejs")
 			Expect(err).To(Equal(provider.ErrImageAuthNotAllowed))
-			Expect(info.ID).To(HaveLen(0))
+			Expect(info).To(BeNil())
 			Expect(mockProxy.PullImageCalled).To(BeFalse())
 		})
 
