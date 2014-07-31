@@ -1198,17 +1198,11 @@ var _ = Describe("server", func() {
 		})
 	})
 
-	Describe("POST /images/:slug/pull", func() {
-		var params *url.Values
-		var slug string
-
-		BeforeEach(func() {
-			params = &url.Values{}
-			slug = "aaa"
-		})
-
+	Describe("POST /images/pull", func() {
 		doRequest := func() {
-			req, err = NewRequest("POST", fmt.Sprintf("/images/%s/pull", slug), params)
+			params := &url.Values{}
+			params.Set("repository", "busybox")
+			req, err = NewRequest("POST", "/images/pull", params)
 			Expect(err).To(BeNil())
 			handler.ServeHTTP(res, req)
 		}
@@ -1217,6 +1211,7 @@ var _ = Describe("server", func() {
 			Expect(prov.PullImageCalled).To(BeFalse())
 			doRequest()
 			Expect(prov.PullImageCalled).To(BeTrue())
+			Expect(prov.ReceivedRepository).To(Equal("busybox"))
 		})
 
 		Context("PullImage() returns successfully", func() {

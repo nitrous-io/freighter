@@ -79,7 +79,7 @@ func (s *Server) drawRoutes() {
 	s.route("/images", s.listImages, "GET")
 	s.route("/images", s.buildImage, "POST")
 	s.route("/images/{slug}", s.wrapError(s.removeImage), "DELETE")
-	s.route("/images/{slug}/pull", s.wrapError(s.pullImage), "POST")
+	s.route("/images/pull", s.wrapError(s.pullImage), "POST")
 	s.route("/images/{slug}/push", s.wrapError(s.pushImage), "POST")
 	s.route("/images/{slug}/tag", s.wrapError(s.tagImage), "POST")
 

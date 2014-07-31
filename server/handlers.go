@@ -417,8 +417,8 @@ func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) pullImage(w http.ResponseWriter, r *http.Request) error {
-	slug := mux.Vars(r)["slug"]
-	info, err := s.provider.PullImage(slug)
+	repo := r.FormValue("repository")
+	info, err := s.provider.PullImage(repo)
 	if err != nil {
 		return err
 	}
