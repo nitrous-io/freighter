@@ -526,7 +526,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 	return located.MatchingImage, nil
 }
 
-func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
+func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 	lookupResult, err := p.lookupImage(imageIDOrName)
 	if err != nil {
 		return err
@@ -534,7 +534,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 
 	matchingImage, _ := lookupResult.MatchingImage, lookupResult.FoundByID
 
-	repository, tag := parsers.ParseRepoAndTag(location)
+	repository, tag := parsers.ParseRepoAndTag(dest)
 
 	finalName := strings.Join([]string{repository, tag}, ":")
 	args := []string{
@@ -548,7 +548,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, location string) error {
 		return err
 	}
 
-	registry := parsers.ParseRegistry(location)
+	registry := parsers.ParseRegistry(dest)
 	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
 	if err != nil {
 		return err

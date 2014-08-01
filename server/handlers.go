@@ -405,8 +405,8 @@ func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) error {
-	slug := mux.Vars(r)["slug"]
-	err := s.provider.RemoveImage(slug)
+	image := r.FormValue("image")
+	err := s.provider.RemoveImage(image)
 	if err != nil {
 		return err
 	}
@@ -425,9 +425,9 @@ func (s *Server) pullImage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) pushImage(w http.ResponseWriter, r *http.Request) error {
-	slug := mux.Vars(r)["slug"]
-	location := mux.Vars(r)["location"]
-	err := s.provider.PushImage(slug, location)
+	image := r.FormValue("image")
+	destination := r.FormValue("destination")
+	err := s.provider.PushImage(image, destination)
 	if err != nil {
 		return err
 	}
@@ -436,13 +436,10 @@ func (s *Server) pushImage(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) tagImage(w http.ResponseWriter, r *http.Request) error {
-	slug := mux.Vars(r)["slug"]
-	tag := mux.Vars(r)["tag"]
-	force := false
-	if mux.Vars(r)["force"] == "true" {
-		force = true
-	}
-	err := s.provider.TagImage(slug, tag, force)
+	image := r.FormValue("image")
+	tag := r.FormValue("tag")
+	force, _ := strconv.ParseBool(r.FormValue("force"))
+	err := s.provider.TagImage(image, tag, force)
 	if err != nil {
 		return err
 	}

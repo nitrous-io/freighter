@@ -85,11 +85,12 @@ type MockProvider struct {
 	ListImagesContents []*provider.ImageInfo
 	ListImagesError    error
 
-	BuildImageCalled  bool
-	BuildImageOutput  string
-	BuildImageReturn  *provider.ImageInfo
-	BuildImageError   error
-	ReceivedImageName string
+	BuildImageCalled         bool
+	BuildImageOutput         string
+	BuildImageReturn         *provider.ImageInfo
+	BuildImageError          error
+	ReceivedImageName        string
+	ReceivedImageDestination string
 
 	RemoveImageCalled bool
 	RemoveImageError  error
@@ -102,8 +103,10 @@ type MockProvider struct {
 	PushImageCalled bool
 	PushImageError  error
 
-	TagImageCalled bool
-	TagImageError  error
+	TagImageCalled   bool
+	TagImageError    error
+	ReceivedTag      string
+	ReceivedTagForce bool
 
 	Containers []*provider.ContainerInfo
 	PublicKeys map[string]string
@@ -259,24 +262,30 @@ func (p *MockProvider) BuildImage(name string, incoming io.Reader, result io.Wri
 	return p.BuildImageReturn, nil
 }
 
-func (p *MockProvider) RemoveImage(slug string) error {
+func (p *MockProvider) RemoveImage(name string) error {
 	p.RemoveImageCalled = true
+	p.ReceivedImageName = name
 	return p.RemoveImageError
 }
 
-func (p *MockProvider) PullImage(location string) (*provider.ImageInfo, error) {
+func (p *MockProvider) PullImage(repository string) (*provider.ImageInfo, error) {
 	p.PullImageCalled = true
-	p.ReceivedRepository = location
+	p.ReceivedRepository = repository
 	return p.PullImageReturn, p.PullImageError
 }
 
-func (p *MockProvider) PushImage(slug, location string) error {
+func (p *MockProvider) PushImage(name, destination string) error {
 	p.PushImageCalled = true
+	p.ReceivedImageName = name
+	p.ReceivedImageDestination = destination
 	return p.PushImageError
 }
 
-func (p *MockProvider) TagImage(slug, newName string, force bool) error {
+func (p *MockProvider) TagImage(name, tag string, force bool) error {
 	p.TagImageCalled = true
+	p.ReceivedImageName = name
+	p.ReceivedTag = tag
+	p.ReceivedTagForce = force
 	return p.TagImageError
 }
 
