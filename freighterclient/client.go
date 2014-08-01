@@ -603,13 +603,17 @@ func (c *client) BuildImage(h *Host, name string, path string) (*Image, error) {
 		return nil, err
 	}
 	_ = writer.WriteField("name", name)
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequest("POST", u, body)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 	resp, err := performRequest(c, req)
 	if err != nil {
 		return nil, err
