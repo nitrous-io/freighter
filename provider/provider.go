@@ -36,6 +36,7 @@ type Provider interface {
 	IsNotFoundError(err error) bool
 	Export(id string, output io.Writer) error
 	Logs(id string, w io.Writer, follow, timestamps bool, tail string) error
+	Reconfig(id string, configJSON string) (info *ContainerInfo, err error)
 
 	Login(username, password, email, registry string) error
 	Logout(registry string) error

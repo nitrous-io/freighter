@@ -33,6 +33,10 @@ type MockClient struct {
 	TerminateCalled int
 	TerminateError  error
 
+	ReconfigCalled        int
+	ReconfigError         error
+	ReconfiguredContainer *Container
+
 	AddPublicKeysCalled int
 	AddPublicKeysError  error
 
@@ -161,6 +165,13 @@ func (c *MockClient) Terminate(id string) (*Container, error) {
 		cntnr.State = ""
 	}
 	return cntnr, c.TerminateError
+}
+
+func (c *MockClient) Reconfig(id string, config ContainerConfig) (*Container, error) {
+	c.ReconfigCalled = c.ReconfigCalled + 1
+	c.ReceivedID = id
+	c.ReceivedConfig = config
+	return c.ReconfiguredContainer, c.ReconfigError
 }
 
 func (c *MockClient) AddPublicKeys(id string, pubkeys []string) error {

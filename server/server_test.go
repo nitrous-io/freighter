@@ -151,7 +151,7 @@ var _ = Describe("server", func() {
 
 				Context("returns a container info with no error", func() {
 					BeforeEach(func() {
-						prov.CreateContainerInfo = &provider.ContainerInfo{ID: "aaa", Name: name, Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning}
+						prov.ContainerInfo = &provider.ContainerInfo{ID: "aaa", Name: name, Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning}
 						doRequest()
 					})
 
@@ -1088,6 +1088,54 @@ var _ = Describe("server", func() {
 				doRequest()
 				Expect(res.Code).To(Equal(http.StatusInternalServerError))
 				Expect(res.Body.String()).To(MatchJSON(`{"error": "sampling failed"}`))
+			})
+		})
+	})
+
+	Describe("POST /containers/:id/reconfig", func() {
+		var (
+			id = "cafebabe"
+		)
+
+		doRequest := func() {
+			params := &url.Values{}
+			params.Set("config", configJSON)
+			req, err = NewRequest("POST", fmt.Sprintf("/containers/%v/reconfig", id), params)
+			Expect(err).To(BeNil())
+			handler.ServeHTTP(res, req)
+		}
+
+		It("calls provider.Reconfig()", func() {
+			Expect(prov.ReconfigCalled).To(BeFalse())
+			doRequest()
+			Expect(prov.ReconfigCalled).To(BeTrue())
+			Expect(prov.ReceivedID).To(Equal(id))
+			Expect(prov.ReceivedConfig).To(Equal(configJSON))
+		})
+
+		Context("when provider.Reconfig() returns an error", func() {
+			BeforeEach(func() {
+				prov.ReconfigError = errors.New("reconfig failed")
+				doRequest()
+			})
+
+			It("responds with 500 Internal Server Error", func() {
+				Expect(res.Code).To(Equal(http.StatusInternalServerError))
+				Expect(res.Body.String()).To(MatchJSON(`{"error":"reconfig failed"}`))
+			})
+		})
+
+		Context("when provider.Reconfig() returns a container info with no error", func() {
+			BeforeEach(func() {
+				prov.ContainerInfo = &provider.ContainerInfo{ID: "aaa", Name: "fragrant-wind-69", Image: "ubuntu", Host: "1.2.3.4", State: provider.ContainerStateRunning}
+				doRequest()
+			})
+
+			It("responds with 200 OK and container info", func() {
+				Expect(res.Code).To(Equal(http.StatusOK))
+				Expect(res.Body.String()).To(MatchJSON(`{"container":{
+							"id":"aaa","name":"fragrant-wind-69","image":"ubuntu","host":"1.2.3.4","state":"running","ports": null
+						}}`))
 			})
 		})
 	})
