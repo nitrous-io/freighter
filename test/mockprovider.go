@@ -85,10 +85,11 @@ type MockProvider struct {
 	ListImagesContents []*provider.ImageInfo
 	ListImagesError    error
 
-	BuildImageCalled bool
-	BuildImageOutput string
-	BuildImageReturn *provider.ImageInfo
-	BuildImageError  error
+	BuildImageCalled  bool
+	BuildImageOutput  string
+	BuildImageReturn  *provider.ImageInfo
+	BuildImageError   error
+	ReceivedImageName string
 
 	RemoveImageCalled bool
 	RemoveImageError  error
@@ -248,12 +249,12 @@ func (p *MockProvider) ListImages() ([]*provider.ImageInfo, error) {
 
 func (p *MockProvider) BuildImage(name string, incoming io.Reader, result io.Writer) (*provider.ImageInfo, error) {
 	p.BuildImageCalled = true
+	p.ReceivedImageName = name
+	result.Write([]byte(p.BuildImageOutput))
 
 	if p.BuildImageError != nil {
 		return nil, p.BuildImageError
 	}
-
-	result.Write([]byte(p.BuildImageOutput))
 
 	return p.BuildImageReturn, nil
 }

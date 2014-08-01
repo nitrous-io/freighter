@@ -335,16 +335,6 @@ func (s *Server) resizeShell(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) listImages(w http.ResponseWriter, r *http.Request) {
-	listing, err := s.provider.ListImages()
-	if err != nil {
-		s.handleError(w, err)
-		return
-	}
-
-	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"images": listing})
-}
-
 func (s *Server) loginRegistry(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
@@ -381,29 +371,37 @@ func (s *Server) serverInfo(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) {
-	fn, _, err := r.FormFile("file")
+func (s *Server) listImages(w http.ResponseWriter, r *http.Request) error {
+	images, err := s.provider.ListImages()
 	if err != nil {
-		s.handleError(w, err)
-		return
+		return err
 	}
-	defer fn.Close()
+
+	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"images": images})
+	return nil
+}
+
+func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) error {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
 	name := r.FormValue("name")
 	var buildBuffer bytes.Buffer
-	info, err := s.provider.BuildImage(name, fn, &buildBuffer)
+	info, err := s.provider.BuildImage(name, file, &buildBuffer)
 	if err != nil {
 		output := buildBuffer.String()
 		if output == "" {
-			s.handleError(w, err)
-		} else {
-			s.respondEncodeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": err.Error(), "output": output})
-			return
+			return err
 		}
-		return
+		s.respondEncodeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": err.Error(), "output": output})
+		return nil
 	}
 
 	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"image": info, "output": buildBuffer.String()})
+	return err
 }
 
 func (s *Server) removeImage(w http.ResponseWriter, r *http.Request) error {

@@ -168,8 +168,8 @@ func (s *Server) drawRoutes() {
 	s.route("/registry/auth", s.loginRegistry, "POST")
 	s.route("/registry/auth", s.logoutRegistry, "DELETE")
 
-	s.route("/images", s.listImages, "GET")
-	s.route("/images", s.buildImage, "POST")
+	s.route("/images", s.wrapError(s.listImages), "GET")
+	s.route("/images", s.wrapError(s.buildImage), "POST")
 	s.route("/images/{slug}", s.wrapError(s.removeImage), "DELETE")
 	s.route("/images/pull", s.wrapError(s.pullImage), "POST")
 	s.route("/images/{slug}/push", s.wrapError(s.pushImage), "POST")

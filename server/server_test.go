@@ -979,14 +979,8 @@ var _ = Describe("server", func() {
 	})
 
 	Describe("GET /images", func() {
-		var params *url.Values
-
-		BeforeEach(func() {
-			params = &url.Values{}
-		})
-
 		doRequest := func() {
-			req, err = NewRequest("GET", "/images", params)
+			req, err = NewRequest("GET", "/images", nil)
 			Expect(err).To(BeNil())
 			handler.ServeHTTP(res, req)
 		}
@@ -997,8 +991,8 @@ var _ = Describe("server", func() {
 			Expect(prov.ListImagesCalled).To(BeTrue())
 		})
 
-		It("should expose the contents under `images`", func() {
-			content1 := &provider.ImageInfo{
+		It("responds with 200 OK and images", func() {
+			i1 := &provider.ImageInfo{
 				ID:          "ID1",
 				Name:        "Source1",
 				Tag:         "SourceTag1",
@@ -1006,7 +1000,7 @@ var _ = Describe("server", func() {
 				ActualSize:  12,
 				VirtualSize: 19,
 			}
-			content2 := &provider.ImageInfo{
+			i2 := &provider.ImageInfo{
 				ID:          "ID2",
 				Name:        "Source2",
 				Tag:         "SourceTag2",
@@ -1014,14 +1008,14 @@ var _ = Describe("server", func() {
 				ActualSize:  40,
 				VirtualSize: 28,
 			}
-			prov.ListImagesContents = []*provider.ImageInfo{content1, content2}
+			prov.ListImagesContents = []*provider.ImageInfo{i1, i2}
 			doRequest()
+			Expect(res.Code).To(Equal(http.StatusOK))
 
 			j, err := json.Marshal(map[string]interface{}{
 				"images": prov.ListImagesContents,
 			})
 			Expect(err).To(BeNil())
-
 			Expect(res.Body.String()).To(MatchJSON(string(j)))
 		})
 
@@ -1095,10 +1089,12 @@ var _ = Describe("server", func() {
 	})
 
 	Describe("POST /images", func() {
-		var params map[string]string
-		var files map[string]string
+		var params, files map[string]string
 
 		BeforeEach(func() {
+			params = map[string]string{
+				"name": "image-name",
+			}
 			files = map[string]string{
 				"file": "test file",
 			}
@@ -1114,6 +1110,7 @@ var _ = Describe("server", func() {
 			Expect(prov.BuildImageCalled).To(BeFalse())
 			doRequest()
 			Expect(prov.BuildImageCalled).To(BeTrue())
+			Expect(prov.ReceivedImageName).To(Equal("image-name"))
 		})
 
 		Context("BuildImage() returns successfully", func() {
@@ -1130,7 +1127,7 @@ var _ = Describe("server", func() {
 				doRequest()
 			})
 
-			It("responds with 200 ok", func() {
+			It("responds with 200 OK", func() {
 				Expect(res.Code).To(Equal(http.StatusOK))
 
 				j, err := json.Marshal(map[string]interface{}{
@@ -1145,12 +1142,24 @@ var _ = Describe("server", func() {
 		Context("BuildImage() returns an error", func() {
 			BeforeEach(func() {
 				prov.BuildImageError = errors.New("Could not build image.")
-				doRequest()
 			})
 
-			It("responds with an error", func() {
+			It("responds with 500 Internal Server Error", func() {
+				doRequest()
 				Expect(res.Code).To(Equal(http.StatusInternalServerError))
 				Expect(res.Body.String()).To(MatchJSON(`{"error":"Could not build image."}`))
+			})
+
+			Context("when the output buffer has contents", func() {
+				BeforeEach(func() {
+					prov.BuildImageOutput = "output error msg"
+				})
+
+				It("responds with 400 Bad Request and renders the output buffer", func() {
+					doRequest()
+					Expect(res.Code).To(Equal(http.StatusBadRequest))
+					Expect(res.Body.String()).To(MatchJSON(`{"error":"Could not build image.", "output": "output error msg"}`))
+				})
 			})
 		})
 	})
