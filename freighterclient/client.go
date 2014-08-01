@@ -92,10 +92,10 @@ type Client interface {
 
 	ListImages() ([]*Image, error)
 	BuildImage(host *Host, name string, path string) (*Image, error)
-	RemoveImage(host *Host, slug string) error
+	RemoveImage(host *Host, image string) error
 	PullImage(host *Host, location string) (*Image, error)
-	PushImage(host *Host, slug, location string) error
-	TagImage(host *Host, slug, newName string, force bool) error
+	PushImage(host *Host, image, destination string) error
+	TagImage(host *Host, image, newName string, force bool) error
 }
 
 type (
@@ -636,9 +636,9 @@ func (c *client) BuildImage(h *Host, name string, path string) (*Image, error) {
 	return imageInfo.Image, nil
 }
 
-func (c *client) RemoveImage(h *Host, slug string) error {
-	u := fmt.Sprintf("%s/images/%s", h.BaseURL(), slug)
-
+func (c *client) RemoveImage(h *Host, image string) error {
+	data := url.Values{"image": []string{image}}
+	u := fmt.Sprintf("%s/images?%s", h.BaseURL(), data.Encode())
 	req, err := http.NewRequest("DELETE", u, nil)
 	if err != nil {
 		return err
@@ -659,9 +659,7 @@ func (c *client) RemoveImage(h *Host, slug string) error {
 
 func (c *client) PullImage(h *Host, repository string) (*Image, error) {
 	u := fmt.Sprintf("%s/images/pull", h.BaseURL())
-
 	data := &url.Values{"repository": []string{repository}}
-
 	req, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
@@ -687,11 +685,12 @@ func (c *client) PullImage(h *Host, repository string) (*Image, error) {
 	return imageInfo.Image, nil
 }
 
-func (c *client) PushImage(h *Host, slug, location string) error {
+func (c *client) PushImage(h *Host, image, destination string) error {
 	u := fmt.Sprintf("%s/images/push", h.BaseURL())
-
-	data := &url.Values{"slug": []string{slug}, "location": []string{location}}
-
+	data := &url.Values{
+		"image":       []string{image},
+		"destination": []string{destination},
+	}
 	req, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
@@ -710,11 +709,13 @@ func (c *client) PushImage(h *Host, slug, location string) error {
 	return nil
 }
 
-func (c *client) TagImage(h *Host, slug, tag string, force bool) error {
+func (c *client) TagImage(h *Host, image, tag string, force bool) error {
 	u := fmt.Sprintf("%s/images/tag", h.BaseURL())
-
-	data := &url.Values{"slug": []string{slug}, "tag": []string{tag}, "force": []string{strconv.FormatBool(force)}}
-
+	data := &url.Values{
+		"image": []string{image},
+		"tag":   []string{tag},
+		"force": []string{strconv.FormatBool(force)},
+	}
 	req, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err

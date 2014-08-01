@@ -1501,7 +1501,7 @@ var _ = Describe("client", func() {
 
 		Describe("RemoveImage()", func() {
 			BeforeEach(func() {
-				setupServer("DELETE", "/images/imageid", "application/x-www-form-urlencoded")
+				setupServer("DELETE", "/images", "application/x-www-form-urlencoded")
 			})
 
 			AfterEach(func() {
@@ -1513,9 +1513,12 @@ var _ = Describe("client", func() {
 					statusCode = http.StatusOK
 				})
 
-				It("should return nil error", func() {
+				It("return nil", func() {
 					err := client.RemoveImage(host, "imageid")
 					Expect(err).To(BeNil())
+					reqs := server.ReceivedRequests()
+					Expect(reqs).To(HaveLen(1))
+					Expect(reqs[0].FormValue("image")).To(Equal("imageid"))
 				})
 			})
 
@@ -1533,7 +1536,6 @@ var _ = Describe("client", func() {
 				It("should surface response failures in StatusErr", func() {
 					statusCode = http.StatusInternalServerError
 					err := client.RemoveImage(host, "imageid")
-
 					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
 				})
 			})
@@ -1554,8 +1556,13 @@ var _ = Describe("client", func() {
 				})
 
 				It("should return nil error", func() {
-					err := client.PushImage(host, "imageid", "hub.docker.com")
+					err := client.PushImage(host, "imageid", "hub.docker.com/me/imageid")
 					Expect(err).To(BeNil())
+
+					reqs := server.ReceivedRequests()
+					Expect(reqs).To(HaveLen(1))
+					Expect(reqs[0].PostFormValue("image")).To(Equal("imageid"))
+					Expect(reqs[0].PostFormValue("destination")).To(Equal("hub.docker.com/me/imageid"))
 				})
 			})
 
@@ -1563,7 +1570,7 @@ var _ = Describe("client", func() {
 				It("should surface request failures", func() {
 					teardownServer()
 
-					err := client.PushImage(host, "imageid", "hub.docker.com")
+					err := client.PushImage(host, "imageid", "hub.docker.com/me/imageid")
 					Expect(err).NotTo(BeNil())
 					_, ok := err.(*freighterclient.RequestFailedError)
 					Expect(ok).To(BeTrue())
@@ -1572,7 +1579,7 @@ var _ = Describe("client", func() {
 
 				It("should surface response failures in StatusErr", func() {
 					statusCode = http.StatusInternalServerError
-					err := client.PushImage(host, "imageid", "hub.docker.com")
+					err := client.PushImage(host, "imageid", "hub.docker.com/me/imageid")
 
 					Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
 				})
@@ -1596,6 +1603,12 @@ var _ = Describe("client", func() {
 				It("should return nil error", func() {
 					err := client.TagImage(host, "imageid", "mytag", true)
 					Expect(err).To(BeNil())
+
+					reqs := server.ReceivedRequests()
+					Expect(reqs).To(HaveLen(1))
+					Expect(reqs[0].PostFormValue("image")).To(Equal("imageid"))
+					Expect(reqs[0].PostFormValue("tag")).To(Equal("mytag"))
+					Expect(reqs[0].PostFormValue("force")).To(Equal("true"))
 				})
 			})
 
@@ -1656,6 +1669,10 @@ var _ = Describe("client", func() {
 						ActualSize:  12,
 						VirtualSize: 39,
 					}))
+
+					reqs := server.ReceivedRequests()
+					Expect(reqs).To(HaveLen(1))
+					Expect(reqs[0].PostFormValue("repository")).To(Equal("myimage:tag"))
 				})
 			})
 
