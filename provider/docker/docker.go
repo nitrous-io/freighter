@@ -54,8 +54,8 @@ type DockerProvider struct {
 }
 
 type lookupImageResult struct {
-	MatchingImage *provider.ImageInfo
-	FoundByID     bool
+	image *provider.ImageInfo
+	byID  bool
 }
 
 func NewDockerProvider(logger *util.Logger, dataPath, namespace string) (*DockerProvider, error) {
@@ -416,21 +416,21 @@ func (p *DockerProvider) ListImages() ([]*provider.ImageInfo, error) {
 	list := []*provider.ImageInfo{}
 	for _, dockerImage := range dockerImages {
 		for _, name := range dockerImage.RepoTags {
-			if strings.HasPrefix(name, p.namespace) {
-				cleansedName := strings.TrimPrefix(name, p.namespace)
-				repoSplit := strings.SplitN(cleansedName, ":", 2)
-				info := &provider.ImageInfo{
-					ID:          dockerImage.ID,
-					Name:        repoSplit[0],
-					CreatedAt:   dockerImage.Created,
-					ActualSize:  dockerImage.Size,
-					VirtualSize: dockerImage.VirtualSize,
-				}
-				if len(repoSplit) > 1 {
-					info.Tag = repoSplit[1]
-				}
-				list = append(list, info)
+			name, ok := p.stripNamespace(name)
+			if !ok {
+				continue
 			}
+
+			repo, tag := parsers.ParseRepoAndTag(name)
+			info := &provider.ImageInfo{
+				ID:          dockerImage.ID,
+				Name:        repo,
+				Tag:         tag,
+				CreatedAt:   dockerImage.Created,
+				ActualSize:  dockerImage.Size,
+				VirtualSize: dockerImage.VirtualSize,
+			}
+			list = append(list, info)
 		}
 	}
 
@@ -454,7 +454,7 @@ func (p *DockerProvider) BuildImage(name string, incoming io.Reader, result io.W
 		return nil, err
 	}
 
-	return info.MatchingImage, nil
+	return info.image, nil
 }
 
 func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
@@ -463,7 +463,7 @@ func (p *DockerProvider) RemoveImage(imageIDOrName string) error {
 		return err
 	}
 
-	image, useID := lookupResult.MatchingImage, lookupResult.FoundByID
+	image, useID := lookupResult.image, lookupResult.byID
 
 	if useID {
 		err = p.client.RemoveImage(image.ID)
@@ -523,7 +523,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 		return nil, err
 	}
 
-	return located.MatchingImage, nil
+	return located.image, nil
 }
 
 func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
@@ -532,7 +532,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 		return err
 	}
 
-	matchingImage, _ := lookupResult.MatchingImage, lookupResult.FoundByID
+	image, _ := lookupResult.image, lookupResult.byID
 
 	repository, tag := parsers.ParseRepoAndTag(dest)
 
@@ -540,7 +540,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 	args := []string{
 		"tag",
 		"-f",
-		matchingImage.ID,
+		image.ID,
 		finalName,
 	}
 	err = exec.Command("docker", args...).Run()
@@ -580,7 +580,7 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 		return err
 	}
 
-	matchingImage := lookupResult.MatchingImage
+	image := lookupResult.image
 
 	repository, tag := parsers.ParseRepoAndTag(newName)
 	if tag == "" {
@@ -600,7 +600,7 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 	args := []string{
 		"tag",
 		"-f",
-		matchingImage.ID,
+		image.ID,
 		finalName,
 	}
 	err = exec.Command("docker", args...).Run()
@@ -683,15 +683,15 @@ func (p *DockerProvider) dockerConfigLocation() (string, error) {
 
 func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, error) {
 	// look up the image to test its validity
-	availableImages, err := p.ListImages()
+	images, err := p.ListImages()
 	if err != nil {
 		return lookupImageResult{}, err
 	}
 
 	var repository, tag string
-	for _, image := range availableImages {
+	for _, image := range images {
 		if image.ID == imageIDOrName {
-			return lookupImageResult{MatchingImage: image, FoundByID: true}, nil
+			return lookupImageResult{image: image, byID: true}, nil
 		} else {
 			// break up parts, only when we truly need to
 			if repository == "" {
@@ -702,7 +702,7 @@ func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, e
 			}
 
 			if repository == image.Name && tag == image.Tag {
-				return lookupImageResult{MatchingImage: image}, nil
+				return lookupImageResult{image: image}, nil
 			}
 		}
 	}
@@ -811,6 +811,14 @@ func (p *DockerProvider) inspectContainer(id string) (*dockerclient.Container, e
 
 func (p *DockerProvider) applyNamespace(name string) string {
 	return p.namespace + name
+}
+
+// Examples (with namespace = "freighter."):
+//   stripNamespace("freighter.foo") -> "foo", true
+//   stripNamespace("foo") -> "foo", false
+func (p *DockerProvider) stripNamespace(name string) (string, bool) {
+	stripped := strings.TrimPrefix(name, p.namespace)
+	return stripped, (stripped != name)
 }
 
 func nameFromContainer(container *dockerclient.Container) string {
