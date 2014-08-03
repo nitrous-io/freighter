@@ -18,6 +18,7 @@ import (
 	dockerclient "github.com/fsouza/go-dockerclient"
 	"github.com/nitrous-io/freighter/provider"
 	"github.com/nitrous-io/freighter/provider/docker"
+	"github.com/nitrous-io/freighter/provider/docker/parsers"
 	. "github.com/nitrous-io/freighter/test"
 	"github.com/nitrous-io/freighter/util"
 	. "github.com/onsi/ginkgo"
@@ -1200,7 +1201,7 @@ var _ = Describe("provider/docker", func() {
 
 			_, err = tempAuthFile.WriteString(authFileSrc)
 			Expect(err).To(BeNil())
-			err = tempAuthFile.Sync()
+			err = tempAuthFile.Close()
 			Expect(err).To(BeNil())
 
 			prov.DockerClientProxy = mockProxy
@@ -1208,7 +1209,7 @@ var _ = Describe("provider/docker", func() {
 		})
 
 		AfterEach(func() {
-			tempAuthFile.Close()
+			os.Remove(tempAuthFile.Name())
 		})
 
 		It("should allow for importing by default hub", func() {
@@ -1401,24 +1402,25 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	Describe(".PushImage()", func() {
-
 		It("should not push if the image is not accessible", func() {
 			created := createImages(1, "namely", true, true, false)
-			err := prov.PushImage(created[0], "cloud1")
+			defer removeImages(created)
+			err := prov.PushImage(created[0], "dont-care")
 			Expect(err).To(Equal(provider.ErrImageNotFound))
-
-			removeImages(created)
 		})
 
 		Context("with an dockercfg authentication file", func() {
-
 			var (
 				mockProxy    *MockDockerProxy
 				tempAuthFile *os.File
+				srcImage     string
 			)
 
 			BeforeEach(func() {
 				var err error
+
+				images := createImages(1, "namely", false, false, false)
+				srcImage = images[0]
 
 				mockProxy = &MockDockerProxy{}
 				tempAuthFile, err = ioutil.TempFile("", "cfg")
@@ -1449,7 +1451,7 @@ var _ = Describe("provider/docker", func() {
 
 				_, err = tempAuthFile.WriteString(authFileSrc)
 				Expect(err).To(BeNil())
-				err = tempAuthFile.Sync()
+				err = tempAuthFile.Close()
 				Expect(err).To(BeNil())
 
 				prov.DockerClientProxy = mockProxy
@@ -1457,22 +1459,13 @@ var _ = Describe("provider/docker", func() {
 			})
 
 			AfterEach(func() {
-				tempAuthFile.Close()
+				removeImages([]string{srcImage})
+				os.Remove(tempAuthFile.Name())
 			})
 
-			It("should handle if auth credentials could not be located", func() {
-				created := createImages(1, "namely", false, false, false)
-				err := prov.PushImage(withoutNamespace(created[0]), "thingyquay.io/callumj/test1")
-				Expect(err).To(Equal(provider.ErrImagePushAuthRequired))
-
-				Expect(mockProxy.PushImageCalled).To(BeFalse())
-
-				removeImages(created)
-			})
-
-			It("should support pushing to the standard Docker Registry endpoint", func() {
-				created := createImages(1, "namely", false, false, false)
-				err := prov.PushImage(withoutNamespace(created[0]), "callumj/test1:n1")
+			It("should support pushing to the default Docker registry endpoint", func() {
+				err := prov.PushImage(withoutNamespace(srcImage), "callumj/test1:n1")
+				defer removeImages([]string{"callumj/test1:n1"})
 				Expect(err).To(BeNil())
 
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
@@ -1481,69 +1474,120 @@ var _ = Describe("provider/docker", func() {
 				Expect(mockProxy.PushImageAuth.Username).To(Equal("test"))
 				Expect(mockProxy.PushImageAuth.Password).To(ContainSubstring("1234xxcc"))
 				Expect(mockProxy.PushImageAuth.Email).To(Equal("docker@callumj.com"))
-
-				removeImages(created)
 			})
 
-			It("should not set tag if not explicit", func() {
-				created := createImages(1, "namely", false, false, false)
-				err := prov.PushImage(withoutNamespace(created[0]), "callumj/test1")
+			It("does not set tag if not specified", func() {
+				err := prov.PushImage(withoutNamespace(srcImage), "callumj/test1")
+				defer removeImages([]string{"callumj/test1"})
 				Expect(err).To(BeNil())
 
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
-				Expect(mockProxy.PushImageOpts.Tag).To(HaveLen(0))
-
-				removeImages(created)
+				Expect(mockProxy.PushImageOpts.Tag).To(Equal(""))
 			})
 
-			It("should set tag if latest is explicit", func() {
-				created := createImages(1, "namely", false, false, false)
-				err := prov.PushImage(withoutNamespace(created[0]), "callumj/test1:latest")
+			It("sets tag if specified", func() {
+				err := prov.PushImage(withoutNamespace(srcImage), "callumj/test1:latest")
+				defer removeImages([]string{"callumj/test1:latest"})
 				Expect(err).To(BeNil())
 
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
 				Expect(mockProxy.PushImageOpts.Tag).To(Equal("latest"))
-
-				removeImages(created)
 			})
 
-			It("should support pushing to an alternative endpoint", func() {
-				created := createImages(1, "namely", false, false, false)
-				err := prov.PushImage(withoutNamespace(created[0]), "quay.io/callumj/test1")
+			It("should support pushing to an alternative registry endpoint", func() {
+				err := prov.PushImage(withoutNamespace(srcImage), "quay.io/callumj/test1:tag")
+				defer removeImages([]string{"quay.io/callumj/test1:tag"})
 				Expect(err).To(BeNil())
 
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
 				Expect(mockProxy.PushImageOpts.Name).To(Equal("quay.io/callumj/test1"))
-				Expect(mockProxy.PushImageOpts.Tag).To(HaveLen(0))
+				Expect(mockProxy.PushImageOpts.Tag).To(Equal("tag"))
 				Expect(mockProxy.PushImageAuth.Username).To(Equal("testo"))
 				Expect(mockProxy.PushImageAuth.Password).To(ContainSubstring("Password1"))
 				Expect(mockProxy.PushImageAuth.Email).To(Equal("quay@callumj.com"))
-
-				removeImages(created)
 			})
 
-			It("should handle a malformed config", func() {
-				created := createImages(1, "namely", false, false, false)
-				err := prov.PushImage(withoutNamespace(created[0]), "magic.io/callumj/test1")
+			It("pushes the image if destination repository name is not specified", func() {
+				name := withoutNamespace(srcImage)
+				repo, tag := parsers.ParseRepoAndTag(name)
+
+				err := prov.PushImage(name, "")
+				defer removeImages([]string{name})
+				Expect(err).To(BeNil())
+
+				Expect(mockProxy.PushImageCalled).To(BeTrue())
+				Expect(mockProxy.PushImageOpts.Name).To(Equal(repo))
+				Expect(mockProxy.PushImageOpts.Tag).To(Equal(tag))
+			})
+
+			It("tags the image with the destination repository name", func() {
+				err := prov.PushImage(withoutNamespace(srcImage), "callumj/test1:mytag")
+				defer removeImages([]string{"callumj/test1:mytag"})
+				Expect(err).To(BeNil())
+
+				srcID := doInspect(srcImage, "{{.Id}}")
+				destID := doInspect("callumj/test1:mytag", "{{.Id}}")
+				Expect(destID).NotTo(BeEmpty())
+				Expect(destID).To(Equal(srcID))
+
+				// Should not tag "namespace.callumj/test1:mytag".
+				out, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", fullNamespaceName("callumj/test1:mytag")).CombinedOutput()
+				Expect(err).NotTo(BeNil())
+				Expect(out).To(ContainSubstring("No such image"))
+			})
+
+			Context("when destination repository already exists locally", func() {
+				var (
+					existingImageName = "test/existing"
+					existingImageID   string
+				)
+
+				BeforeEach(func() {
+					err := exec.Command("docker", "tag", "-f", image, existingImageName).Run()
+					Expect(err).To(BeNil())
+					o, err := exec.Command("docker", "inspect", "-f", "{{.Id}}", existingImageName).CombinedOutput()
+					existingImageID = strings.TrimSpace(string(o))
+					Expect(err).To(BeNil())
+					Expect(existingImageID).NotTo(BeEmpty())
+				})
+
+				AfterEach(func() {
+					removeImages([]string{existingImageName})
+				})
+
+				It("overrides the local image by tagging it", func() {
+					err := prov.PushImage(withoutNamespace(srcImage), existingImageName)
+					Expect(err).To(BeNil())
+
+					Expect(mockProxy.PushImageCalled).To(BeTrue())
+					Expect(mockProxy.PushImageOpts.Name).To(Equal(existingImageName))
+					Expect(mockProxy.PushImageOpts.Tag).To(Equal(""))
+
+					newID := doInspect(existingImageName, "{{.Id}}")
+					Expect(newID).NotTo(Equal(existingImageID))
+				})
+			})
+
+			It("returns an error when auth credentials could not be located", func() {
+				err := prov.PushImage(withoutNamespace(srcImage), "thingyquay.io/callumj/test1")
 				Expect(err).To(Equal(provider.ErrImagePushAuthRequired))
-
 				Expect(mockProxy.PushImageCalled).To(BeFalse())
+			})
 
-				removeImages(created)
+			It("returns an error when auth config is malformed", func() {
+				err := prov.PushImage(withoutNamespace(srcImage), "magic.io/callumj/test1")
+				Expect(err).To(Equal(provider.ErrImagePushAuthRequired))
+				Expect(mockProxy.PushImageCalled).To(BeFalse())
 			})
 
 			It("should surface PushImage errors", func() {
-				created := createImages(1, "namely", false, false, false)
-				sharedErr := errors.New("Sorry!")
-				mockProxy.PushImageError = sharedErr
-				err := prov.PushImage(withoutNamespace(created[0]), "quay.io/callumj/test1")
-				Expect(err).To(Equal(sharedErr))
-
+				e := errors.New("Sorry!")
+				mockProxy.PushImageError = e
+				err := prov.PushImage(withoutNamespace(srcImage), "callumj/test1")
+				defer removeImages([]string{"callumj/test1"})
+				Expect(err).To(Equal(e))
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
-
-				removeImages(created)
 			})
-
 		})
 
 	})

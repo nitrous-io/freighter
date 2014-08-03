@@ -526,26 +526,29 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 	return located.image, nil
 }
 
+// PushImage pushes an image identified by its ID or name to a destination
+// repository.
+//
+// If destination repository is "", the image is simply pushed.
+//
+// As a side effect, the image will be tagged with the destination repository.
+//
+// Examples:
+//   push rails to chuyeow/rails
+//   push rails to quay.io/chuyeow/railsbox
+//   push quay.io/chuyeow/rails
+//   push quay.io/chuyeow/rails to tsuru.io/nitrous/railsbox
 func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 	lookupResult, err := p.lookupImage(imageIDOrName)
 	if err != nil {
 		return err
 	}
 
-	image, _ := lookupResult.image, lookupResult.byID
+	image := lookupResult.image
 
-	repository, tag := parsers.ParseRepoAndTag(dest)
-
-	finalName := strings.Join([]string{repository, tag}, ":")
-	args := []string{
-		"tag",
-		"-f",
-		image.ID,
-		finalName,
-	}
-	err = exec.Command("docker", args...).Run()
-	if err != nil {
-		return err
+	// If destination repository is blank, we just want to push the image.
+	if dest == "" {
+		dest = strings.Join([]string{image.Name, image.Tag}, ":")
 	}
 
 	registry := parsers.ParseRegistry(dest)
@@ -558,6 +561,18 @@ func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 		return provider.ErrImagePushAuthRequired
 	}
 
+	args := []string{
+		"tag",
+		"-f",
+		image.ID,
+		dest,
+	}
+	err = exec.Command("docker", args...).Run()
+	if err != nil {
+		return err
+	}
+
+	repository, tag := parsers.ParseRepoAndTag(dest)
 	var buf bytes.Buffer
 	// while PushImageOptions contains a Registry attribute, it does not work
 	// docker push XXXXXX calls the API with the full name (registry and repository) as the image name
@@ -566,12 +581,8 @@ func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 		Tag:          tag,
 		OutputStream: &buf,
 	}
-	err = p.DockerClientProxy.PushImage(pushOpts, auth)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return p.DockerClientProxy.PushImage(pushOpts, auth)
 }
 
 func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) error {
