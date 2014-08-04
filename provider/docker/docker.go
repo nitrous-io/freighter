@@ -417,6 +417,79 @@ func (p *DockerProvider) ListImages() ([]*provider.ImageInfo, error) {
 	return list, nil
 }
 
+func (p *DockerProvider) Reconfig(id string, configJSON string) (*provider.ContainerInfo, error) {
+	// attempt to stop the container if it's running
+	info, err := p.Stop(id)
+	if err != nil {
+		return nil, err
+	}
+
+	id = info.ID
+	containerName := info.Name
+
+	p.logger.Info("DockerProvider: commiting container", containerName)
+	image, err := p.client.CommitContainer(dockerclient.CommitContainerOptions{
+		Container: id,
+	})
+	p.logger.Info("DockerProvider: commited container", containerName)
+
+	p.logger.Info("DockerProvider: removing container", containerName)
+	err = p.client.RemoveContainer(dockerclient.RemoveContainerOptions{ID: id})
+	if err != nil {
+		return nil, err
+	}
+	p.logger.Info("DockerProvider: removed container", containerName)
+
+	p.logger.Info("DockerProvider: re-creating container", containerName)
+	config, hostConfig, err := parseConfigParam(configJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Create and use a custom image tag to
+	// refer the image.
+	createConfig := &dockerclient.Config{
+		Hostname: containerName,
+		Image:    image.ID,
+		Volumes: map[string]struct{}{
+			"/etc/ssh/freighter": {},
+		},
+		ExposedPorts: map[dockerclient.Port]struct{}{},
+	}
+	overrideConfig(createConfig, config)
+
+	container, err := p.client.CreateContainer(dockerclient.CreateContainerOptions{
+		Name:   containerName,
+		Config: createConfig,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	id = container.ID
+	p.logger.Info("DockerProvider: re-created container", containerName, id, "in")
+
+	p.logger.Info("DockerProvider: starting container", containerName)
+	startConfig := &dockerclient.HostConfig{
+		Binds: []string{
+			(p.containerSettingsDir(containerName) + "/ssh:/etc/ssh/freighter:ro"),
+		},
+		PortBindings:    map[dockerclient.Port][]dockerclient.PortBinding{},
+		PublishAllPorts: true,
+	}
+	overrideHostConfig(startConfig, hostConfig)
+
+	err = p.client.StartContainer(id, startConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	p.logger.Info("DockerProvider: started container", containerName, id, "in")
+
+	return p.GetInfo(id)
+}
+
 func (p *DockerProvider) createContainer(imageName, containerName string, config *allowedConfig, hostConfig *allowedHostConfig) (*dockerclient.Container, error) {
 	p.logger.Info("DockerProvider: creating container", containerName, "with image", imageName)
 	start := time.Now()

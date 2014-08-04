@@ -65,6 +65,7 @@ type Client interface {
 	Stop(id string) (*Container, error)
 	Restart(id string) (*Container, error)
 	Terminate(id string) (*Container, error)
+	Reconfig(slug string, config ContainerConfig) (*Container, error)
 
 	AddPublicKeys(id string, keys []string) error
 	ClearPublicKeys(id string) error
@@ -338,6 +339,49 @@ func (c *client) Terminate(id string) (*Container, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		// Success, do nothing.
+	case http.StatusNotFound:
+		return nil, ErrContainerNotFound
+	default:
+		return nil, &StatusError{resp.StatusCode}
+	}
+
+	containerResp, err := unmarshalContainerResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	return containerResp.Container, nil
+}
+
+// Reconfig makes an API request to a given Freighter host to reconfigure the
+// Container with the given id. It accepts a ContainerConfig.
+// The reconfigured Container is returned.
+// If the Container does not exist, ErrContainerNotFound is returned.
+func (c *client) Reconfig(id string, config ContainerConfig) (*Container, error) {
+	u := fmt.Sprintf("%s/containers/%s/reconfig", c.host.BaseURL(), id)
+	data := url.Values{}
+
+	if config != nil {
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return nil, err
+		}
+		data.Set("config", string(configJSON))
+	}
+
+	req, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := performRequest(c, req)
+	if err != nil {
+		return nil, err
+	}
 
 	switch resp.StatusCode {
 	case http.StatusOK:

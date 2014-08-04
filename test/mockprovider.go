@@ -10,9 +10,9 @@ import (
 var ErrMockProviderContainerNotFound = errors.New("no such container")
 
 type MockProvider struct {
-	CreateCalled        bool
-	CreateContainerInfo *provider.ContainerInfo
-	CreateError         error
+	CreateCalled  bool
+	ContainerInfo *provider.ContainerInfo
+	CreateError   error
 
 	TerminateCalled bool
 	TerminateError  error
@@ -85,6 +85,9 @@ type MockProvider struct {
 	ListImagesContents []*provider.ImageInfo
 	ListImagesError    error
 
+	ReconfigCalled bool
+	ReconfigError  error
+
 	Containers []*provider.ContainerInfo
 	PublicKeys map[string]string
 }
@@ -101,7 +104,7 @@ func (p *MockProvider) Create(name, image, config string) (*provider.ContainerIn
 	p.ReceivedName = name
 	p.ReceivedImage = image
 	p.ReceivedConfig = config
-	return p.CreateContainerInfo, p.CreateError
+	return p.ContainerInfo, p.CreateError
 }
 
 func (p *MockProvider) GetInfo(id string) (*provider.ContainerInfo, error) {
@@ -247,6 +250,13 @@ func (p *MockProvider) RemoveVolume(slug string) error {
 func (p *MockProvider) GetVolumeInfo(slug string) (*provider.VolumeInfo, error) {
 	p.VolumeInfoCalled = true
 	return p.VolumeInfoReturn, p.VolumeInfoError
+}
+
+func (p *MockProvider) Reconfig(id, configJSON string) (*provider.ContainerInfo, error) {
+	p.ReconfigCalled = true
+	p.ReceivedID = id
+	p.ReceivedConfig = configJSON
+	return p.ContainerInfo, p.ReconfigError
 }
 
 func (p *MockProvider) IsNotFoundError(err error) bool {

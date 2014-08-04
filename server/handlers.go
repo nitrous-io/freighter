@@ -380,6 +380,17 @@ func (s *Server) serverInfo(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func (s *Server) reconfigContainer(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	info, err := s.provider.Reconfig(id, r.FormValue("config"))
+	if err != nil {
+		s.handleError(w, err)
+	} else {
+		s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"container": info})
+	}
+}
+
 func hijackServer(w http.ResponseWriter) (io.ReadCloser, io.Writer, error) {
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {

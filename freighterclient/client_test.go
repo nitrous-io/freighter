@@ -696,6 +696,120 @@ var _ = Describe("client", func() {
 		})
 	})
 
+	Describe("Reconfig()", func() {
+		var (
+			statusCode   int
+			responseBody string
+
+			config = freighterclient.NewDockerContainerConfig()
+		)
+
+		BeforeEach(func() {
+			handlers := ghttp.CombineHandlers(
+				func(w http.ResponseWriter, req *http.Request) {
+					// Call ParseForm() so that server.ReceivedRequests() have
+					// POST params populated.
+					err := req.ParseForm()
+					Expect(err).To(BeNil())
+				},
+				ghttp.VerifyRequest("POST", "/containers/cafebabe/reconfig"),
+				ghttp.VerifyContentType("application/x-www-form-urlencoded"),
+				ghttp.RespondWithPtr(&statusCode, &responseBody),
+			)
+			var err error
+			st, err = NewServerTest(handlers)
+			Expect(err).To(BeNil(), "test server failed to start")
+			cl, host, server = st.client, st.host, st.server
+		})
+
+		AfterEach(func() {
+			if server.HTTPTestServer != nil {
+				server.Close()
+			}
+		})
+
+		Context("when the response is HTTP 200 OK", func() {
+			BeforeEach(func() {
+				statusCode = http.StatusOK
+			})
+
+			Context("when the response has a container", func() {
+				BeforeEach(func() {
+					responseBody = `{
+						"container": {
+							"id":"cafebabe",
+							"name":"yosemite",
+							"image":"ubuntu",
+							"host":"172.17.0.1",
+							"ssh_port":60001,
+							"state":"running"
+						}
+					}`
+				})
+
+				It("returns the Container", func() {
+					config.Env = []string{"LANG=C"}
+					container, err := cl.Reconfig("cafebabe", config)
+					Expect(err).To(BeNil())
+					Expect(container).NotTo(BeNil())
+
+					receivedRequests := server.ReceivedRequests()
+					Expect(receivedRequests).To(HaveLen(1))
+
+					Expect(receivedRequests[0].PostFormValue("config")).To(Equal(
+						`{"Config":{"Env":["LANG=C"]},"HostConfig":{}}`))
+
+					Expect(container).To(Equal(&freighterclient.Container{
+						ID:    "cafebabe",
+						Name:  "yosemite",
+						Image: "ubuntu",
+						Host:  "172.17.0.1",
+						State: "running",
+					}))
+				})
+			})
+
+			Context("when the response is empty", func() {
+				BeforeEach(func() {
+					responseBody = ``
+				})
+
+				It("returns ErrUnexpectedResponse", func() {
+					container, err := cl.Reconfig("cafebabe", config)
+					Expect(err).To(MatchError(freighterclient.ErrUnexpectedResponse))
+					Expect(server.ReceivedRequests()).To(HaveLen(1))
+					Expect(container).To(BeNil())
+				})
+			})
+		})
+
+		Context("when the response is HTTP 404 Not Found", func() {
+			BeforeEach(func() {
+				statusCode = http.StatusNotFound
+			})
+
+			It("returns ErrContainerNotFound", func() {
+				container, err := cl.Reconfig("cafebabe", config)
+				Expect(err).To(MatchError(freighterclient.ErrContainerNotFound))
+				Expect(server.ReceivedRequests()).To(HaveLen(1))
+				Expect(container).To(BeNil())
+			})
+		})
+
+		Context("when the response is not HTTP 200 OK nor HTTP 404 Not Found", func() {
+			BeforeEach(func() {
+				statusCode = http.StatusInternalServerError
+			})
+
+			It("returns a StatusError", func() {
+				container, err := cl.Reconfig("cafebabe", config)
+				Expect(err).To(MatchError(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
+				Expect(server.ReceivedRequests()).To(HaveLen(1))
+				Expect(container).To(BeNil())
+			})
+		})
+	})
+
 	Describe("Public Key Operations", func() {
 		var (
 			statusCode   int
