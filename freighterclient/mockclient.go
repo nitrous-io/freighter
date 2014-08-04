@@ -255,7 +255,7 @@ func (c *MockClient) ListImages() ([]*Image, error) {
 	return c.ListImagesArray, c.ListImagesError
 }
 
-func (c *MockClient) BuildImage(h *Host, name, path string) (*Image, error) {
+func (c *MockClient) BuildImage(name, path string) (*Image, error) {
 	c.BuildImageCalled = c.BuildImageCalled + 1
 	c.BuildImageName = name
 	c.BuildImagePath = path
@@ -263,25 +263,25 @@ func (c *MockClient) BuildImage(h *Host, name, path string) (*Image, error) {
 	return c.BuildImageReturn, c.BuildImageError
 }
 
-func (c *MockClient) RemoveImage(h *Host, slug string) error {
+func (c *MockClient) RemoveImage(slug string) error {
 	c.RemoveImageCalled = c.RemoveImageCalled + 1
 
 	return c.RemoveImageError
 }
 
-func (c *MockClient) PullImage(h *Host, location string) (*Image, error) {
+func (c *MockClient) PullImage(location string) (*Image, error) {
 	c.PullImageCalled = c.PullImageCalled + 1
 
 	return c.PullImageReturn, c.PullImageError
 }
 
-func (c *MockClient) PushImage(h *Host, slug, location string) error {
+func (c *MockClient) PushImage(slug, location string) error {
 	c.PushImageCalled = c.PushImageCalled + 1
 
 	return c.PushImageError
 }
 
-func (c *MockClient) TagImage(h *Host, slug, newName string, force bool) error {
+func (c *MockClient) TagImage(slug, newName string, force bool) error {
 	c.TagImageCalled = c.TagImageCalled + 1
 	c.ReceivedImage = slug
 	c.ReceivedTag = newName

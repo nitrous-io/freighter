@@ -91,11 +91,11 @@ type Client interface {
 	HostInfo() (*HostInfo, error)
 
 	ListImages() ([]*Image, error)
-	BuildImage(host *Host, name string, path string) (*Image, error)
-	RemoveImage(host *Host, image string) error
-	PullImage(host *Host, location string) (*Image, error)
-	PushImage(host *Host, image, destination string) error
-	TagImage(host *Host, image, newName string, force bool) error
+	BuildImage(name string, path string) (*Image, error)
+	RemoveImage(image string) error
+	PullImage(location string) (*Image, error)
+	PushImage(image, destination string) error
+	TagImage(image, newName string, force bool) error
 }
 
 type (
@@ -584,14 +584,14 @@ func (c *client) ListImages() ([]*Image, error) {
 	return images.Images, nil
 }
 
-func (c *client) BuildImage(h *Host, name string, path string) (*Image, error) {
+func (c *client) BuildImage(name string, path string) (*Image, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	u := fmt.Sprintf("%s/images", h.BaseURL())
+	u := fmt.Sprintf("%s/images", c.host.BaseURL())
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("file", filepath.Base(path))
@@ -636,9 +636,9 @@ func (c *client) BuildImage(h *Host, name string, path string) (*Image, error) {
 	return imageInfo.Image, nil
 }
 
-func (c *client) RemoveImage(h *Host, image string) error {
+func (c *client) RemoveImage(image string) error {
 	data := url.Values{"image": []string{image}}
-	u := fmt.Sprintf("%s/images?%s", h.BaseURL(), data.Encode())
+	u := fmt.Sprintf("%s/images?%s", c.host.BaseURL(), data.Encode())
 	req, err := http.NewRequest("DELETE", u, nil)
 	if err != nil {
 		return err
@@ -657,8 +657,8 @@ func (c *client) RemoveImage(h *Host, image string) error {
 	return nil
 }
 
-func (c *client) PullImage(h *Host, repository string) (*Image, error) {
-	u := fmt.Sprintf("%s/images/pull", h.BaseURL())
+func (c *client) PullImage(repository string) (*Image, error) {
+	u := fmt.Sprintf("%s/images/pull", c.host.BaseURL())
 	data := &url.Values{"repository": []string{repository}}
 	req, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -685,8 +685,8 @@ func (c *client) PullImage(h *Host, repository string) (*Image, error) {
 	return imageInfo.Image, nil
 }
 
-func (c *client) PushImage(h *Host, image, destination string) error {
-	u := fmt.Sprintf("%s/images/push", h.BaseURL())
+func (c *client) PushImage(image, destination string) error {
+	u := fmt.Sprintf("%s/images/push", c.host.BaseURL())
 	data := &url.Values{
 		"image":       []string{image},
 		"destination": []string{destination},
@@ -709,8 +709,8 @@ func (c *client) PushImage(h *Host, image, destination string) error {
 	return nil
 }
 
-func (c *client) TagImage(h *Host, image, tag string, force bool) error {
-	u := fmt.Sprintf("%s/images/tag", h.BaseURL())
+func (c *client) TagImage(image, tag string, force bool) error {
+	u := fmt.Sprintf("%s/images/tag", c.host.BaseURL())
 	data := &url.Values{
 		"image": []string{image},
 		"tag":   []string{tag},
