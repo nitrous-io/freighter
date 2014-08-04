@@ -501,14 +501,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 	existingName := strings.Join([]string{repository, tag}, ":")
 	newName := strings.Join([]string{newRepo, tag}, ":")
 
-	// current version of the docker client only accepts "repo"
-	// causing the tag be part of the repo name, the docker CLI performs the correct action
-	args := []string{
-		"tag",
-		existingName,
-		newName,
-	}
-	err = exec.Command("docker", args...).Run()
+	err = dockerTag(existingName, newName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -561,13 +554,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 		return provider.ErrImagePushAuthRequired
 	}
 
-	args := []string{
-		"tag",
-		"-f",
-		image.ID,
-		dest,
-	}
-	err = exec.Command("docker", args...).Run()
+	err = dockerTag(image.ID, dest, true)
 	if err != nil {
 		return err
 	}
@@ -608,13 +595,7 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 		}
 	}
 
-	args := []string{
-		"tag",
-		"-f",
-		image.ID,
-		finalName,
-	}
-	err = exec.Command("docker", args...).Run()
+	err = dockerTag(image.ID, finalName, true)
 	if err != nil {
 		return err
 	}
@@ -901,4 +882,13 @@ func containerConfigFromJSON(jsonStr string) (*provider.ContainerConfig, error) 
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func dockerTag(image string, newName string, force bool) error {
+	args := []string{"tag"}
+	if force {
+		args = append(args, "-f")
+	}
+	args = append(args, image, newName)
+	return exec.Command("docker", args...).Run()
 }
