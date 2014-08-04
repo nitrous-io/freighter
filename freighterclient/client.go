@@ -12,8 +12,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -91,7 +89,7 @@ type Client interface {
 	HostInfo() (*HostInfo, error)
 
 	ListImages() ([]*Image, error)
-	BuildImage(name string, path string) (*Image, error)
+	BuildImage(name string, in io.Reader) (*Image, error)
 	RemoveImage(image string) error
 	PullImage(location string) (*Image, error)
 	PushImage(image, destination string) error
@@ -584,21 +582,15 @@ func (c *client) ListImages() ([]*Image, error) {
 	return images.Images, nil
 }
 
-func (c *client) BuildImage(name string, path string) (*Image, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
+func (c *client) BuildImage(name string, in io.Reader) (*Image, error) {
 	u := fmt.Sprintf("%s/images", c.host.BaseURL())
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", filepath.Base(path))
+	part, err := writer.CreateFormFile("file", "Dockerfile")
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.Copy(part, file)
+	_, err = io.Copy(part, in)
 	if err != nil {
 		return nil, err
 	}

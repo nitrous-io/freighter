@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"time"
 
@@ -1346,8 +1345,6 @@ var _ = Describe("client", func() {
 		var (
 			statusCode   int
 			responseBody string
-
-			filename = os.TempDir() + "/Dockerfile.test"
 		)
 
 		teardownServer := func() {
@@ -1370,17 +1367,10 @@ var _ = Describe("client", func() {
 
 			st, _ = NewServerTest(handlers)
 			cl, host, server = st.client, st.host, st.server
-
-			file, err := os.Create(filename)
-			Expect(err).To(BeNil())
-			defer file.Close()
-			_, err = file.Write([]byte("my dockerfile"))
-			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {
 			teardownServer()
-			os.Remove(filename)
 		})
 
 		Context("Successful Response", func() {
@@ -1400,7 +1390,7 @@ var _ = Describe("client", func() {
 			})
 
 			It("should be capable of extracting an Image response", func() {
-				image, err := cl.BuildImage("myimage:tag", filename)
+				image, err := cl.BuildImage("myimage:tag", bytes.NewBufferString("dockerfile"))
 				Expect(err).To(BeNil())
 
 				Expect(image).To(Equal(&freighterclient.Image{
@@ -1419,7 +1409,7 @@ var _ = Describe("client", func() {
 				Expect(file).NotTo(BeNil())
 				b, err := ioutil.ReadAll(file)
 				Expect(err).To(BeNil())
-				Expect(b).To(Equal([]byte("my dockerfile")))
+				Expect(b).To(Equal([]byte("dockerfile")))
 			})
 		})
 
@@ -1430,7 +1420,7 @@ var _ = Describe("client", func() {
 			})
 
 			It("should handle JSON decoding errors", func() {
-				image, err := cl.BuildImage("myimage:tag", filename)
+				image, err := cl.BuildImage("myimage:tag", bytes.NewBufferString("dockerfile"))
 				Expect(err).To(Equal(freighterclient.ErrUnexpectedResponse))
 				Expect(image).To(BeNil())
 			})
@@ -1440,7 +1430,7 @@ var _ = Describe("client", func() {
 			It("should surface request failures", func() {
 				teardownServer()
 
-				image, err := cl.BuildImage("myimage:tag", filename)
+				image, err := cl.BuildImage("myimage:tag", bytes.NewBufferString("dockerfile"))
 				Expect(err).NotTo(BeNil())
 				_, ok := err.(*freighterclient.RequestFailedError)
 				Expect(ok).To(BeTrue())
@@ -1450,7 +1440,7 @@ var _ = Describe("client", func() {
 
 			It("should surface response failures in StatusErr", func() {
 				statusCode = http.StatusInternalServerError
-				image, err := cl.BuildImage("myimage:tag", filename)
+				image, err := cl.BuildImage("myimage:tag", bytes.NewBufferString("dockerfile"))
 
 				Expect(err).To(Equal(&freighterclient.StatusError{Code: http.StatusInternalServerError}))
 				Expect(image).To(BeNil())

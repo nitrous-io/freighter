@@ -81,7 +81,7 @@ type MockClient struct {
 	BuildImageReturn *Image
 	BuildImageError  error
 	BuildImageName   string
-	BuildImagePath   string
+	BuildImageReader io.Reader
 
 	RemoveImageCalled int
 	RemoveImageError  error
@@ -184,21 +184,18 @@ func (c *MockClient) Terminate(id string) (*Container, error) {
 func (c *MockClient) AddPublicKeys(id string, pubkeys []string) error {
 	c.AddPublicKeysCalled = c.AddPublicKeysCalled + 1
 	c.ReceivedID = id
-
 	return c.AddPublicKeysError
 }
 
 func (c *MockClient) ClearPublicKeys(id string) error {
 	c.ClearPublicKeysCalled = c.ClearPublicKeysCalled + 1
 	c.ReceivedID = id
-
 	return c.ClearPublicKeysError
 }
 
 func (c *MockClient) RemovePublicKey(id string, fingerprint string) error {
 	c.RemovePublicKeyCalled = c.RemovePublicKeyCalled + 1
 	c.ReceivedID = id
-
 	return c.RemovePublicKeyError
 }
 
@@ -233,14 +230,12 @@ func (c *MockClient) RegistryLogin(p *RegistryAuth) error {
 	c.ReceivedPassword = p.Password
 	c.ReceivedEmail = p.Email
 	c.ReceivedRegistry = p.Registry
-
 	return c.RegistryLoginError
 }
 
 func (c *MockClient) RegistryLogout(registry string) error {
 	c.RegistryLogoutCalled = c.RegistryLogoutCalled + 1
 	c.ReceivedRegistry = registry
-
 	return c.RegistryLogoutError
 }
 
@@ -251,33 +246,28 @@ func (c *MockClient) HostInfo() (*HostInfo, error) {
 
 func (c *MockClient) ListImages() ([]*Image, error) {
 	c.ListImagesCalled = c.ListImagesCalled + 1
-
 	return c.ListImagesArray, c.ListImagesError
 }
 
-func (c *MockClient) BuildImage(name, path string) (*Image, error) {
+func (c *MockClient) BuildImage(name string, in io.Reader) (*Image, error) {
 	c.BuildImageCalled = c.BuildImageCalled + 1
 	c.BuildImageName = name
-	c.BuildImagePath = path
-
+	c.BuildImageReader = in
 	return c.BuildImageReturn, c.BuildImageError
 }
 
 func (c *MockClient) RemoveImage(slug string) error {
 	c.RemoveImageCalled = c.RemoveImageCalled + 1
-
 	return c.RemoveImageError
 }
 
 func (c *MockClient) PullImage(location string) (*Image, error) {
 	c.PullImageCalled = c.PullImageCalled + 1
-
 	return c.PullImageReturn, c.PullImageError
 }
 
 func (c *MockClient) PushImage(slug, location string) error {
 	c.PushImageCalled = c.PushImageCalled + 1
-
 	return c.PushImageError
 }
 
@@ -286,6 +276,5 @@ func (c *MockClient) TagImage(slug, newName string, force bool) error {
 	c.ReceivedImage = slug
 	c.ReceivedTag = newName
 	c.TagImageForce = force
-
 	return c.TagImageError
 }
