@@ -77,10 +77,12 @@ func ipAndPort(s *ghttp.Server) (string, int, error) {
 
 var _ = Describe("client", func() {
 	var (
-		st     *ServerTest
-		cl     freighterclient.Client
-		host   *freighterclient.Host
-		server *ghttp.Server
+		st           *ServerTest
+		cl           freighterclient.Client
+		host         *freighterclient.Host
+		server       *ghttp.Server
+		statusCode   int
+		responseBody string
 	)
 
 	Describe("NewClientHTTP", func() {
@@ -106,11 +108,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("List()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/containers"),
@@ -237,11 +234,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("Create()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				func(w http.ResponseWriter, req *http.Request) {
@@ -373,11 +365,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("Info()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/containers/deadbeef"),
@@ -477,9 +464,6 @@ var _ = Describe("client", func() {
 		var (
 			fnUnderTest func(id string) (*freighterclient.Container, error)
 			path        string
-
-			statusCode   int
-			responseBody string
 
 			id = "facecafe"
 		)
@@ -612,11 +596,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("Terminate()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("DELETE", "/containers/cafefeed"),
@@ -698,11 +677,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("Public Key Operations", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		setupServer := func(method, url string) {
 			handlers := ghttp.CombineHandlers(
 				func(w http.ResponseWriter, req *http.Request) {
@@ -882,11 +856,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("ListVolumes()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/volumes"),
@@ -949,11 +918,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("CreateVolume()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				func(w http.ResponseWriter, req *http.Request) {
@@ -1006,11 +970,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("RemoveVolume()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("DELETE", "/volumes/music"),
@@ -1049,11 +1008,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("GetVolumeInfo()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/volumes/music"),
@@ -1102,11 +1056,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("RegistryLogin()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("POST", "/registry/auth"),
@@ -1184,11 +1133,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("RegistryLogout()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("DELETE", "/registry/auth"),
@@ -1263,11 +1207,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("HostInfo()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", "/info"),
@@ -1342,11 +1281,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("BuildImage()", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		teardownServer := func() {
 			if server.HTTPTestServer != nil {
 				server.Close()
@@ -1449,11 +1383,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("Image Operations", func() {
-		var (
-			statusCode   int
-			responseBody string
-		)
-
 		setupServer := func(method, url, contentType string) {
 			handlers := ghttp.CombineHandlers(
 				func(w http.ResponseWriter, req *http.Request) {
