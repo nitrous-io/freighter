@@ -1281,12 +1281,6 @@ var _ = Describe("client", func() {
 	})
 
 	Describe("BuildImage()", func() {
-		teardownServer := func() {
-			if server.HTTPTestServer != nil {
-				server.Close()
-			}
-		}
-
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
 				func(w http.ResponseWriter, req *http.Request) {
@@ -1304,7 +1298,7 @@ var _ = Describe("client", func() {
 		})
 
 		AfterEach(func() {
-			teardownServer()
+			st.Close()
 		})
 
 		Context("Successful Response", func() {
@@ -1362,7 +1356,7 @@ var _ = Describe("client", func() {
 
 		Context("with failures communicating with endpoint", func() {
 			It("should surface request failures", func() {
-				teardownServer()
+				st.Close()
 
 				image, err := cl.BuildImage("myimage:tag", bytes.NewBufferString("dockerfile"))
 				Expect(err).NotTo(BeNil())
@@ -1402,19 +1396,13 @@ var _ = Describe("client", func() {
 			cl, host, server = st.client, st.host, st.server
 		}
 
-		teardownServer := func() {
-			if server.HTTPTestServer != nil {
-				server.Close()
-			}
-		}
-
 		Describe("RemoveImage()", func() {
 			BeforeEach(func() {
 				setupServer("DELETE", "/images", "application/x-www-form-urlencoded")
 			})
 
 			AfterEach(func() {
-				teardownServer()
+				st.Close()
 			})
 
 			Context("Successful response", func() {
@@ -1433,7 +1421,7 @@ var _ = Describe("client", func() {
 
 			Context("Error Response - with failures communicating with endpoint", func() {
 				It("should surface request failures", func() {
-					teardownServer()
+					st.Close()
 
 					err := cl.RemoveImage("imageid")
 					Expect(err).NotTo(BeNil())
@@ -1456,7 +1444,7 @@ var _ = Describe("client", func() {
 			})
 
 			AfterEach(func() {
-				teardownServer()
+				st.Close()
 			})
 
 			Context("Successful response", func() {
@@ -1477,7 +1465,7 @@ var _ = Describe("client", func() {
 
 			Context("Error Response - with failures communicating with endpoint", func() {
 				It("should surface request failures", func() {
-					teardownServer()
+					st.Close()
 
 					err := cl.PushImage("imageid", "hub.docker.com/me/imageid")
 					Expect(err).NotTo(BeNil())
@@ -1501,7 +1489,7 @@ var _ = Describe("client", func() {
 			})
 
 			AfterEach(func() {
-				teardownServer()
+				st.Close()
 			})
 
 			Context("Successful response", func() {
@@ -1523,7 +1511,7 @@ var _ = Describe("client", func() {
 
 			Context("Error Response - with failures communicating with endpoint", func() {
 				It("should surface request failures", func() {
-					teardownServer()
+					st.Close()
 
 					err := cl.TagImage("imageid", "mytag", true)
 					Expect(err).NotTo(BeNil())
@@ -1547,7 +1535,7 @@ var _ = Describe("client", func() {
 			})
 
 			AfterEach(func() {
-				teardownServer()
+				st.Close()
 			})
 
 			Context("Successful response", func() {
@@ -1600,7 +1588,7 @@ var _ = Describe("client", func() {
 
 			Context("Error Response - with failures communicating with endpoint", func() {
 				It("should surface request failures", func() {
-					teardownServer()
+					st.Close()
 
 					image, err := cl.PullImage("myimage:tag")
 					Expect(err).NotTo(BeNil())
@@ -1626,7 +1614,7 @@ var _ = Describe("client", func() {
 			})
 
 			AfterEach(func() {
-				teardownServer()
+				st.Close()
 			})
 
 			Context("Successful Response", func() {
@@ -1695,7 +1683,7 @@ var _ = Describe("client", func() {
 
 			Context("Error Response - failures communicating with endpoint", func() {
 				It("should surface request failures", func() {
-					teardownServer()
+					st.Close()
 
 					images, err := cl.ListImages()
 					Expect(err).NotTo(BeNil())
