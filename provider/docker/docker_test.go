@@ -54,7 +54,7 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	cleanUpContainer := func(name string) {
-		exec.Command("docker", "stop", name).Run()
+		exec.Command("docker", "stop", "--time=1", name).Run()
 		exec.Command("docker", "rm", name).Run()
 	}
 
@@ -83,27 +83,23 @@ var _ = Describe("provider/docker", func() {
 	}
 
 	createImages := func(count int, name string, hidden, noFindable, noEntropy bool) []string {
-		dockerSource := `
+		dockerLoc, err := ioutil.TempDir("", "DockerTest")
+		Expect(err).To(BeNil())
+		dockerFile, err := os.Create(filepath.Join(dockerLoc, "Dockerfile"))
+		Expect(err).To(BeNil())
+
+		entropy := name
+		if noEntropy {
+			entropy = "thing"
+		}
+		dockerFile.WriteString(fmt.Sprintf(`
 			FROM %s
 			MAINTAINER Nitrous.IO, hello@nitrous.io
 
 			RUN echo '%s' >> /tmp/info
 
 			CMD /bin/bash
-			`
-		var entropy string
-		if !noEntropy {
-			entropy = name
-		} else {
-			entropy = "thing"
-		}
-		interpolated := fmt.Sprintf(dockerSource, image, entropy)
-		dockerLoc, err := ioutil.TempDir("", "DockerTest")
-		Expect(err).To(BeNil())
-		fileLoc := filepath.Join(dockerLoc, "Dockerfile")
-		dockerFile, err := os.Create(fileLoc)
-		Expect(err).To(BeNil())
-		dockerFile.WriteString(interpolated)
+		`, image, entropy))
 		dockerFile.Close()
 
 		list := []string{}
@@ -121,22 +117,20 @@ var _ = Describe("provider/docker", func() {
 			}
 		}
 
-		err = os.Remove(fileLoc)
-		Expect(err).To(BeNil())
-		err = os.Remove(dockerLoc)
+		err = os.RemoveAll(dockerLoc)
 		Expect(err).To(BeNil())
 
 		return list
 	}
 
-	removeCreated := func(names []string) {
-		for _, name := range names {
-			exec.Command("docker", "rmi", name).Run()
-		}
+	removeImages := func(names []string) {
+		args := append([]string{"rmi"}, names...)
+		err := exec.Command("docker", args...).Run()
+		Expect(err).To(BeNil())
 	}
 
 	withoutNamespace := func(name string) string {
-		return strings.TrimPrefix(name, strings.Join([]string{namespace, "."}, ""))
+		return strings.TrimPrefix(name, namespace+".")
 	}
 
 	Describe(".Create()", func() {
@@ -906,8 +900,8 @@ var _ = Describe("provider/docker", func() {
 			})
 
 			AfterEach(func() {
-				removeCreated(publicImages)
-				removeCreated(nonPublicImages)
+				removeImages(publicImages)
+				removeImages(nonPublicImages)
 			})
 
 			It("should not expose images not managed by the namespace", func() {
@@ -954,7 +948,7 @@ var _ = Describe("provider/docker", func() {
 			})
 
 			AfterEach(func() {
-				removeCreated(createdImages)
+				removeImages(createdImages)
 			})
 
 			It("should break them out into separate entries", func() {
@@ -1062,68 +1056,49 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	Describe(".RemoveImage()", func() {
-
-		var (
-			publicImages    []string
-			nonPublicImages []string
-		)
-
-		BeforeEach(func() {
-			publicImages = createImages(1, "removeable", false, false, false)
-			nonPublicImages = createImages(1, "nonremoveable", true, true, false)
-		})
-
-		AfterEach(func() {
-			removeCreated(publicImages)
-			removeCreated(nonPublicImages)
-		})
-
 		Context("when an ID is provided", func() {
 			Context("when the image is not owned the namespace", func() {
 				It("should return an error not locating image", func() {
-					id := doInspect(nonPublicImages[0], "{{.Id}}")
-					Expect(id).ToNot(HaveLen(0))
+					images := createImages(1, "nonremoveable", true, true, false)
+					defer removeImages(images)
+
+					id := doInspect(images[0], "{{.Id}}")
+					Expect(id).ToNot(BeEmpty())
 					err := prov.RemoveImage(id)
 					Expect(err).To(Equal(provider.ErrImageNotFound))
-
-					id = doInspect(publicImages[0], "{{.Id}}")
-					Expect(id).ToNot(HaveLen(0))
 				})
 			})
 
 			Context("when the image is owned by the namespace", func() {
 				It("should be deleted", func() {
-					id := doInspect(publicImages[0], "{{.Id}}")
-					Expect(id).ToNot(HaveLen(0))
+					images := createImages(1, "removeable", false, false, false)
+
+					id := doInspect(images[0], "{{.Id}}")
+					Expect(id).ToNot(BeEmpty())
 					err := prov.RemoveImage(id)
 					Expect(err).To(BeNil())
 
-					out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
+					out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", images[0]).CombinedOutput()
 					Expect(out).To(ContainSubstring("Error: No such image or container:"))
 				})
 
 				Context("with multiple images under ID", func() {
-					var (
-						multipleImages []string
-					)
-
-					BeforeEach(func() {
-						multipleImages = createImages(1, "multremoveable", false, false, true)
-						multipleImages = append(multipleImages, createImages(1, "multremoveable2", false, false, true)...)
-					})
-
-					AfterEach(func() {
-						removeCreated(multipleImages)
-					})
-
 					It("should not allow for deletion", func() {
-						id := doInspect(multipleImages[0], "{{.Id}}")
-						Expect(id).ToNot(HaveLen(0))
-						err := prov.RemoveImage(id)
+						i1 := createImages(1, "multremoveable", false, false, true)
+						defer removeImages(i1)
+						i2 := createImages(1, "multremoveable2", false, false, true)
+						defer removeImages(i2)
+
+						id1 := doInspect(i1[0], "{{.Id}}")
+						id2 := doInspect(i2[0], "{{.Id}}")
+						Expect(id1).ToNot(BeEmpty())
+						Expect(id1).To(Equal(id2))
+
+						err := prov.RemoveImage(id1)
 						Expect(err).To(Equal(provider.ErrImageShared))
 
-						id = doInspect(multipleImages[0], "{{.Id}}")
-						Expect(id).ToNot(HaveLen(0))
+						id1 = doInspect(i1[0], "{{.Id}}")
+						Expect(id1).ToNot(BeEmpty())
 					})
 				})
 			})
@@ -1132,20 +1107,25 @@ var _ = Describe("provider/docker", func() {
 		Context("when a Name is provided", func() {
 			Context("when the image is not owned the namespace", func() {
 				It("should return an error not locating image", func() {
-					err := prov.RemoveImage(nonPublicImages[0])
+					images := createImages(1, "nonremoveable", true, true, false)
+					defer removeImages(images)
+
+					err := prov.RemoveImage(images[0])
 					Expect(err).To(Equal(provider.ErrImageNotFound))
 
-					id := doInspect(nonPublicImages[0], "{{.Id}}")
+					id := doInspect(images[0], "{{.Id}}")
 					Expect(id).ToNot(HaveLen(0))
 				})
 			})
 
 			Context("when the image is owned by the namespace", func() {
 				It("should be deleted", func() {
-					err := prov.RemoveImage(withoutNamespace(publicImages[0]))
+					images := createImages(1, "removeable", false, false, false)
+
+					err := prov.RemoveImage(withoutNamespace(images[0]))
 					Expect(err).To(BeNil())
 
-					out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", publicImages[0]).CombinedOutput()
+					out, _ := exec.Command("docker", "inspect", "-f", "{{.Id}}", images[0]).CombinedOutput()
 					Expect(out).To(ContainSubstring("Error: No such image or container:"))
 				})
 			})
@@ -1362,7 +1342,7 @@ var _ = Describe("provider/docker", func() {
 			err := prov.TagImage(created[0], "namely2", false)
 			Expect(err).To(Equal(provider.ErrImageNotFound))
 
-			removeCreated(created)
+			removeImages(created)
 		})
 
 		It("should not allow for tagging images outside of the namespace with an ID", func() {
@@ -1371,7 +1351,7 @@ var _ = Describe("provider/docker", func() {
 			err := prov.TagImage(id, "idly2", false)
 			Expect(err).To(Equal(provider.ErrImageNotFound))
 
-			removeCreated(created)
+			removeImages(created)
 		})
 
 		It("should allow for tagging images without tags", func() {
@@ -1380,7 +1360,7 @@ var _ = Describe("provider/docker", func() {
 			Expect(err).To(BeNil())
 
 			verifyImageExistence("withoutly2:latest")
-			removeCreated(created)
+			removeImages(created)
 		})
 
 		It("should allow for tagging images with tags", func() {
@@ -1389,7 +1369,7 @@ var _ = Describe("provider/docker", func() {
 			Expect(err).To(BeNil())
 
 			verifyImageExistence("tagly2:1907")
-			removeCreated(created)
+			removeImages(created)
 		})
 
 		Context("image tag already exists", func() {
@@ -1399,7 +1379,7 @@ var _ = Describe("provider/docker", func() {
 				err := prov.TagImage(withoutNamespace(created[0]), "nooverridely:n1", false)
 				Expect(err).To(Equal(provider.ErrImageTagExists))
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 			It("should override existing tags with force", func() {
@@ -1412,8 +1392,8 @@ var _ = Describe("provider/docker", func() {
 
 				newId := getID("overridelyreplacey:n1")
 				Expect(newId).ToNot(Equal(curId))
-				removeCreated(target)
-				removeCreated(destination)
+				removeImages(target)
+				removeImages(destination)
 			})
 
 		})
@@ -1427,7 +1407,7 @@ var _ = Describe("provider/docker", func() {
 			err := prov.PushImage(created[0], "cloud1")
 			Expect(err).To(Equal(provider.ErrImageNotFound))
 
-			removeCreated(created)
+			removeImages(created)
 		})
 
 		Context("with an dockercfg authentication file", func() {
@@ -1487,7 +1467,7 @@ var _ = Describe("provider/docker", func() {
 
 				Expect(mockProxy.PushImageCalled).To(BeFalse())
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 			It("should support pushing to the standard Docker Registry endpoint", func() {
@@ -1502,7 +1482,7 @@ var _ = Describe("provider/docker", func() {
 				Expect(mockProxy.PushImageAuth.Password).To(ContainSubstring("1234xxcc"))
 				Expect(mockProxy.PushImageAuth.Email).To(Equal("docker@callumj.com"))
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 			It("should not set tag if not explicit", func() {
@@ -1513,7 +1493,7 @@ var _ = Describe("provider/docker", func() {
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
 				Expect(mockProxy.PushImageOpts.Tag).To(HaveLen(0))
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 			It("should set tag if latest is explicit", func() {
@@ -1524,7 +1504,7 @@ var _ = Describe("provider/docker", func() {
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
 				Expect(mockProxy.PushImageOpts.Tag).To(Equal("latest"))
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 			It("should support pushing to an alternative endpoint", func() {
@@ -1539,7 +1519,7 @@ var _ = Describe("provider/docker", func() {
 				Expect(mockProxy.PushImageAuth.Password).To(ContainSubstring("Password1"))
 				Expect(mockProxy.PushImageAuth.Email).To(Equal("quay@callumj.com"))
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 			It("should handle a malformed config", func() {
@@ -1549,7 +1529,7 @@ var _ = Describe("provider/docker", func() {
 
 				Expect(mockProxy.PushImageCalled).To(BeFalse())
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 			It("should surface PushImage errors", func() {
@@ -1561,7 +1541,7 @@ var _ = Describe("provider/docker", func() {
 
 				Expect(mockProxy.PushImageCalled).To(BeTrue())
 
-				removeCreated(created)
+				removeImages(created)
 			})
 
 		})
