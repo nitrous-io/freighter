@@ -586,7 +586,7 @@ func (c *client) BuildImage(name string, in io.Reader) (*Image, error) {
 	u := fmt.Sprintf("%s/images", c.host.BaseURL())
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", "Dockerfile")
+	part, err := writer.CreateFormFile("file", "buildcontext.tar")
 	if err != nil {
 		return nil, err
 	}

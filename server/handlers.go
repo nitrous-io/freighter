@@ -382,15 +382,20 @@ func (s *Server) listImages(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) buildImage(w http.ResponseWriter, r *http.Request) error {
-	file, _, err := r.FormFile("file")
+	_, fh, err := r.FormFile("file")
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+
+	f, err := fh.Open()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
 	name := r.FormValue("name")
 	var buildBuffer bytes.Buffer
-	info, err := s.provider.BuildImage(name, file, &buildBuffer)
+	info, err := s.provider.BuildImage(name, f, &buildBuffer)
 	if err != nil {
 		output := buildBuffer.String()
 		if output == "" {
