@@ -218,7 +218,11 @@ func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 		return nil, err
 	}
 
+	// FIXME: im not sure why we need GetInfo here
 	info, err = p.GetInfo(id)
+	if err != nil {
+		return nil, err
+	}
 
 	p.logger.Info("DockerProvider: removing container", id)
 	start := time.Now()

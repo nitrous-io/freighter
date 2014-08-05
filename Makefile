@@ -30,6 +30,10 @@ test:
 	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
 	@script/test $(TEST)
 
+unittest:
+	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
+	@INTEGRATION=false script/test $(TEST)
+
 ci: image
 	@echo "$(OK_COLOR)==> Running within docker...$(NO_COLOR)"
 	@script/ci $(VERSION)

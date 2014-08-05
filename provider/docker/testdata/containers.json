@@ -1,0 +1,34 @@
+[
+  {
+    "Id": "8dfafdbc3a40",
+    "Names": ["/freighter.hello"],
+    "Image": "base:latest",
+    "Command": "echo 1",
+    "Created": 1367854155,
+    "Status": "Exit 0",
+    "Ports":[{"PrivatePort": 2222, "PublicPort": 3333, "Type": "tcp"}],
+    "SizeRw":12288,
+    "SizeRootFs":0
+  },
+  {
+    "Id": "9cd87474be90",
+    "Names": ["/freighter.world"],
+    "Image": "base:latest",
+    "Command": "echo 222222",
+    "Created": 1367854155,
+    "Status": "Exit 0",
+    "Ports":[],
+    "SizeRw":12288,
+    "SizeRootFs":0
+  },
+  {
+    "Id": "3176a2479c92",
+    "Image": "base:latest",
+    "Command": "echo 3333333333333333",
+    "Created": 1367854154,
+    "Status": "Exit 0",
+    "Ports":[],
+    "SizeRw":12288,
+    "SizeRootFs":0
+  }
+]

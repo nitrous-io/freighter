@@ -10,15 +10,22 @@ die() {
   echo $* && exit 1
 }
 
-test -f /var/run/docker.pid || docker -d -e lxc >& /var/log/docker.log &
-while test ! -f /var/run/docker.pid; do sleep 1; done
-version=$(docker version | grep 'Client version' | cut -d':' -f2 | tr -d ' ')
-docker pull ddollar/dind:$version >/dev/null 2>&1 || die "image ddollar/dind:$version does not exist"
+if [[ "$INTEGRATION" = "false" ]]
+then
+  env FREIGHTERD_BASE=$tmp \
+    goop exec ginkgo -r -trace -keepGoing -noisyPendings=false $*
+else
+  test -f /var/run/docker.pid || docker -d -e lxc >& /var/log/docker.log &
+  while test ! -f /var/run/docker.pid; do sleep 1; done
+  version=$(docker version | grep 'Client version' | cut -d':' -f2 | tr -d ' ')
+  docker pull ddollar/dind:$version >/dev/null 2>&1 || die "image ddollar/dind:$version does not exist"
 
-# ddollar/dind is built from https://github.com/jpetazzo/dind
-cid=$(docker run --privileged -d -v $tmp:$tmp -e PORT=4444 ddollar/dind)
-ip=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $cid)
+  # ddollar/dind is built from https://github.com/jpetazzo/dind
+  cid=$(docker run --privileged -d -v $tmp:$tmp -e PORT=4444 ddollar/dind)
+  ip=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $cid)
 
-trap cleanup EXIT
+  trap cleanup EXIT
 
-env FREIGHTERD_BASE=$tmp DOCKER_IP=$ip DOCKER_HOST=tcp://$ip:4444 goop exec ginkgo -r -trace -keepGoing -noisyPendings=false $*
+  env FREIGHTERD_BASE=$tmp DOCKER_IP=$ip DOCKER_HOST=tcp://$ip:4444 \
+    goop exec ginkgo -r -trace -keepGoing -noisyPendings=false -tags 'integration' $*
+fi
