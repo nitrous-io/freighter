@@ -955,11 +955,10 @@ var _ = Describe("provider/docker", func() {
 			It("should break them out into separate entries", func() {
 				imageList, err := prov.ListImages()
 				Expect(err).To(BeNil())
+				Expect(imageList).To(HaveLen(2))
 
-				Expect(len(imageList)).To(Equal(2))
 				i1 := imageList[0]
 				i2 := imageList[1]
-
 				Expect(i1.Name).To(Equal("multiple"))
 				Expect(i2.Name).To(Equal("multiple"))
 				Expect(i1.Tag).To(Equal("n1"))
