@@ -1,4 +1,4 @@
-package docker_test
+package integrationtest
 
 import (
 	"fmt"
@@ -23,10 +23,10 @@ import (
 
 func Test(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "provider/docker")
+	RunSpecs(t, "integration/docker")
 }
 
-var _ = Describe("provider/docker", func() {
+var _ = Describe("docker", func() {
 	var (
 		prov      *docker.DockerProvider
 		namespace = "freightertest"
