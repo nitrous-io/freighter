@@ -122,6 +122,26 @@ var _ = Describe("provider/docker", func() {
 			Expect(list[1].State).To(Equal("stopped"))
 		})
 	})
+
+	Describe(".Restart", func() {
+		runningContainer, _ := ioutil.ReadFile("./testdata/container/running_container.json")
+
+		It("restarts a container", func() {
+			ts := newTestServer()
+			defer ts.Close()
+			s := ts.server
+			prov, err := docker.NewDockerProvider(logger, "datapath", "freighter")
+			Expect(err).To(BeNil(), "failed to initialize docker provider")
+
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(runningContainer)))
+			s.AddResponse("POST", "containers/restart", dockertest.NewResponse(204, ""))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(runningContainer)))
+
+			info, err := prov.Restart("container-id")
+			Expect(err).To(BeNil(), "container failed to be restarted")
+			Expect(info.State).To(Equal("running"))
+		})
+	})
 })
 
 type testServer struct {
