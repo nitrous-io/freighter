@@ -142,6 +142,47 @@ var _ = Describe("provider/docker", func() {
 			Expect(info.State).To(Equal("running"))
 		})
 	})
+
+	Describe(".Terminate", func() {
+		runningContainer, _ := ioutil.ReadFile("./testdata/container/running_container.json")
+		stoppedContainer, _ := ioutil.ReadFile("./testdata/container/stopped_container.json")
+
+		It("terminates a stopped container", func() {
+			ts := newTestServer()
+			defer ts.Close()
+			s := ts.server
+			prov, err := docker.NewDockerProvider(logger, "datapath", "freighter")
+			Expect(err).To(BeNil(), "failed to initialize docker provider")
+
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(stoppedContainer)))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(stoppedContainer)))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(stoppedContainer)))
+			s.AddResponse("DELETE", "containers/id", dockertest.NewResponse(204, ""))
+
+			info, err := prov.Terminate("container-id")
+			Expect(err).To(BeNil(), "container failed to be terminated")
+			Expect(info.State).To(Equal(""))
+		})
+
+		It("stops and terminates a running container", func() {
+			ts := newTestServer()
+			defer ts.Close()
+			s := ts.server
+			prov, err := docker.NewDockerProvider(logger, "datapath", "freighter")
+			Expect(err).To(BeNil(), "failed to initialize docker provider")
+
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(runningContainer)))
+			s.AddResponse("POST", "containers/stop", dockertest.NewResponse(204, ""))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(stoppedContainer)))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(stoppedContainer)))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(stoppedContainer)))
+			s.AddResponse("DELETE", "containers/id", dockertest.NewResponse(204, ""))
+
+			info, err := prov.Terminate("container-id")
+			Expect(err).To(BeNil(), "container failed to be terminated")
+			Expect(info.State).To(Equal(""))
+		})
+	})
 })
 
 type testServer struct {
