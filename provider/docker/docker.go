@@ -501,7 +501,7 @@ func (p *DockerProvider) PullImage(location string) (*provider.ImageInfo, error)
 	existingName := strings.Join([]string{repository, tag}, ":")
 	newName := strings.Join([]string{newRepo, tag}, ":")
 
-	err = dockerTag(existingName, newName, false)
+	err = p.dockerTag(existingName, newName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +554,7 @@ func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 		return provider.ErrImagePushAuthRequired
 	}
 
-	err = dockerTag(image.ID, dest, true)
+	err = p.dockerTag(image.ID, dest, true)
 	if err != nil {
 		return err
 	}
@@ -595,7 +595,7 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 		}
 	}
 
-	err = dockerTag(image.ID, finalName, true)
+	err = p.dockerTag(image.ID, finalName, true)
 	if err != nil {
 		return err
 	}
@@ -801,6 +801,15 @@ func (p *DockerProvider) inspectContainer(id string) (*dockerclient.Container, e
 	return container, nil
 }
 
+func (p *DockerProvider) dockerTag(image string, newName string, force bool) error {
+	repo, tag := parsers.ParseRepoAndTag(newName)
+	return p.client.TagImage(image, dockerclient.TagImageOptions{
+		Repo:  repo,
+		Tag:   tag,
+		Force: force,
+	})
+}
+
 func (p *DockerProvider) applyNamespace(name string) string {
 	return p.namespace + name
 }
@@ -882,13 +891,4 @@ func containerConfigFromJSON(jsonStr string) (*provider.ContainerConfig, error) 
 		return nil, err
 	}
 	return cfg, nil
-}
-
-func dockerTag(image string, newName string, force bool) error {
-	args := []string{"tag"}
-	if force {
-		args = append(args, "-f")
-	}
-	args = append(args, image, newName)
-	return exec.Command("docker", args...).Run()
 }
