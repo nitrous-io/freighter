@@ -98,6 +98,30 @@ var _ = Describe("provider/docker", func() {
 			Expect(info.State).To(Equal("stopped"))
 		})
 	})
+
+	Describe(".List", func() {
+		containers, _ := ioutil.ReadFile("./testdata/containers.json")
+		runningContainer, _ := ioutil.ReadFile("./testdata/container/running_container.json")
+		stoppedContainer, _ := ioutil.ReadFile("./testdata/container/stopped_container.json")
+
+		It("returns a list of all containers managed by freighter", func() {
+			ts := newTestServer()
+			defer ts.Close()
+			s := ts.server
+			prov, err := docker.NewDockerProvider(logger, "datapath", "freighter")
+			Expect(err).To(BeNil(), "failed to initialize docker provider")
+
+			s.AddResponse("GET", "containers", dockertest.NewResponse(200, string(containers)))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(runningContainer)))
+			s.AddResponse("GET", "containers/id", dockertest.NewResponse(200, string(stoppedContainer)))
+
+			list, err := prov.List()
+			Expect(err).To(BeNil(), "failed to get list of freighter's containers")
+			Expect(len(list)).To(Equal(2))
+			Expect(list[0].State).To(Equal("running"))
+			Expect(list[1].State).To(Equal("stopped"))
+		})
+	})
 })
 
 type testServer struct {
