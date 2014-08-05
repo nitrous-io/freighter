@@ -1,3 +1,5 @@
+// +build integration
+
 package integrationtest
 
 import (
@@ -17,14 +19,7 @@ import (
 	"github.com/nitrous-io/freighter/util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"testing"
 )
-
-func Test(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "integration/docker")
-}
 
 var _ = Describe("docker", func() {
 	var (
