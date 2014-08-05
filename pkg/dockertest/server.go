@@ -30,6 +30,7 @@ var (
 			"/containers/{id:.*}/unpause": "containers/unpause",
 			"/containers/{id:.*}/wait":    "containers/wait",
 			"/containers/{id:.*}/attach":  "containers/attach",
+			"/containers/{id:.*}/restart": "containers/restart",
 			"/images/create":              "images/create",
 			"/images/{name:.*}/push":      "images/push",
 			"/build":                      "build",
