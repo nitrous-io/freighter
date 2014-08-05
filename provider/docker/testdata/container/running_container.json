@@ -1,0 +1,80 @@
+{
+  "Id": "b11beab0adb2a77d6dc871ed27d85b9c4824c2b0c82e215aa6effd4beaad9e9e",
+  "Name": "/freighter.containerid",
+  "HostnamePath": "/var/lib/docker/containers/b11beab0adb2a77d6dc871ed27d85b9c4824c2b0c82e215aa6effd4beaad9e9e/hostname",
+  "HostsPath": "/var/lib/docker/containers/b11beab0adb2a77d6dc871ed27d85b9c4824c2b0c82e215aa6effd4beaad9e9e/hosts",
+  "Image": "161ef9459ce24391033eaa45d898690fa8e9b1a96d014ea6ef3f9645e55e95ae",
+  "Path": "su",
+  "ResolvConfPath": "/var/lib/docker/containers/b11beab0adb2a77d6dc871ed27d85b9c4824c2b0c82e215aa6effd4beaad9e9e/resolv.conf",
+  "State": {
+    "ExitCode": 0,
+    "Paused": false,
+    "Pid": 17881,
+    "Running": true
+  },
+  "Volumes": {},
+  "VolumesRW": {},
+  "Args": [
+    "znc --foreground"
+  ],
+  "Config": {
+    "AttachStderr": false,
+    "AttachStdin": false,
+    "AttachStdout": false,
+    "Cmd": [
+      "su",
+      "-",
+      "znc --foreground"
+    ],
+    "CpuShares": 0,
+    "Cpuset": "",
+    "Domainname": "",
+    "Entrypoint": null,
+    "Env": [],
+    "ExposedPorts": {
+      "6000/tcp": {}
+    },
+    "Hostname": "b11beab0adb2",
+    "Image": "dqminh/znc",
+    "Memory": 0,
+    "MemorySwap": 0,
+    "NetworkDisabled": false,
+    "OnBuild": null,
+    "OpenStdin": false,
+    "PortSpecs": null,
+    "StdinOnce": false,
+    "Tty": false,
+    "User": "",
+    "Volumes": {},
+    "WorkingDir": ""
+  },
+  "HostConfig": {
+    "Binds": null,
+    "ContainerIDFile": "",
+    "Dns": null,
+    "DnsSearch": null,
+    "Links": null,
+    "LxcConf": [],
+    "NetworkMode": "bridge",
+    "PortBindings": {
+      "6000/tcp": [
+        { "HostIp": "0.0.0.0", "HostPort": "6000" }
+      ]
+    },
+    "Privileged": false,
+    "PublishAllPorts": false,
+    "VolumesFrom": null
+  },
+  "NetworkSettings": {
+    "Bridge": "docker0",
+    "Gateway": "172.17.42.1",
+    "IPAddress": "172.17.0.3",
+    "IPPrefixLen": 16,
+    "PortMapping": null,
+    "Ports": {
+      "6000/tcp": [
+        { "HostIp": "0.0.0.0", "HostPort": "6000" }
+      ]
+    }
+  }
+}
