@@ -582,6 +582,10 @@ func (c *client) ListImages() ([]*Image, error) {
 	return images.Images, nil
 }
 
+// BuildImage builds an image. The input stream should be a tar archive (which
+// can be either uncompressed or compressed with gzip/bzip2/xz). The archive
+// must include a file named Dockerfile at its root. Any other files are made
+// available as the build context.
 func (c *client) BuildImage(name string, in io.Reader) (*Image, error) {
 	u := fmt.Sprintf("%s/images", c.host.BaseURL())
 	body := &bytes.Buffer{}
