@@ -20,8 +20,9 @@ func Test(t *testing.T) {
 
 var _ = Describe("provider/docker", func() {
 	logger := &util.Logger{Level: util.LogLevelQuiet}
-	runningContainer, _ := ioutil.ReadFile("./testdata/container/running_container.json")
-	stoppedContainer, _ := ioutil.ReadFile("./testdata/container/stopped_container.json")
+	runningContainer, _ := ioutil.ReadFile("./testdata/running_container.json")
+	stoppedContainer, _ := ioutil.ReadFile("./testdata/stopped_container.json")
+	containers, _ := ioutil.ReadFile("./testdata/containers.json")
 
 	Describe(".Start", func() {
 		It("starts the container when it's stopped", func() {
@@ -100,10 +101,6 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	Describe(".List", func() {
-		containers, _ := ioutil.ReadFile("./testdata/containers.json")
-		runningContainer, _ := ioutil.ReadFile("./testdata/container/running_container.json")
-		stoppedContainer, _ := ioutil.ReadFile("./testdata/container/stopped_container.json")
-
 		It("returns a list of all containers managed by freighter", func() {
 			ts := newTestServer()
 			defer ts.Close()
@@ -124,7 +121,7 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	Describe(".Restart", func() {
-		runningContainer, _ := ioutil.ReadFile("./testdata/container/running_container.json")
+		runningContainer, _ := ioutil.ReadFile("./testdata/running_container.json")
 
 		It("restarts a container", func() {
 			ts := newTestServer()
@@ -144,9 +141,6 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	Describe(".Terminate", func() {
-		runningContainer, _ := ioutil.ReadFile("./testdata/container/running_container.json")
-		stoppedContainer, _ := ioutil.ReadFile("./testdata/container/stopped_container.json")
-
 		It("terminates a stopped container", func() {
 			ts := newTestServer()
 			defer ts.Close()
