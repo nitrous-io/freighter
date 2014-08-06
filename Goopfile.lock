@@ -5,4 +5,4 @@ github.com/fsouza/go-dockerclient #194816684825a3abf28d60e5243ec5240608414d
 github.com/gorilla/context #14f550f51af52180c2eefed15e5fd18d63c0a64a
 github.com/kr/pty #67e2db24c831afa6c64fc17b4a143390674365ef
 github.com/nitrous-io/nitrous-common #534a33b553508b717d30d28160f8dbebb482f16c !git@github.com:nitrous-io/nitrous-common
-github.com/c9s/goprocinfo/linux #4aacc5a471d5027aeebf371f0acf7b38f276a77d
+github.com/shirou/gopsutil #d08c3d9b78723df395d333ed2aa846f73347dd21

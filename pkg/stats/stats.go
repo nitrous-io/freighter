@@ -1,10 +1,9 @@
 package stats
 
 import (
-	"syscall"
 	"time"
 
-	"github.com/c9s/goprocinfo/linux"
+	"github.com/shirou/gopsutil"
 )
 
 type Stats struct {
@@ -29,22 +28,20 @@ type Stats struct {
 var Sample = func(period time.Duration) (*Stats, error) {
 	stats := &Stats{}
 
-	sys := &syscall.Sysinfo_t{}
-	err := syscall.Sysinfo(sys)
-	if err != nil {
-		return nil, err
+	if h, err := gopsutil.HostInfo(); err == nil {
+		stats.Uptime = h.Uptime
 	}
-	unit := uint64(sys.Unit) // Sysinfo_t.Unit is the memory unit size in bytes.
-	stats.Uptime = uint64(sys.Uptime)
-	stats.MemoryUsage = (sys.Totalram - sys.Freeram) / unit
-	stats.MemoryTotal = sys.Totalram / unit
 
-	statfs := &syscall.Statfs_t{}
-	syscall.Statfs("/", statfs) // Assume root volume is the volume made available to users.
-	total := statfs.Blocks * uint64(statfs.Bsize)
-	used := total - (statfs.Bfree * uint64(statfs.Bsize))
-	stats.StorageUsage = used
-	stats.StorageTotal = total
+	if mem, err := gopsutil.VirtualMemory(); err == nil {
+		stats.MemoryUsage = mem.Used
+		stats.MemoryTotal = mem.Total
+	}
+
+	// Assume root volume is the volume made available to users.
+	if d, err := gopsutil.DiskUsage("/"); err == nil {
+		stats.StorageUsage = d.Used * 1024 // Convert kb to bytes.
+		stats.StorageTotal = d.Total * 1024
+	}
 
 	errch := make(chan error)
 	usagech := make(chan []float64)
@@ -69,24 +66,38 @@ var Sample = func(period time.Duration) (*Stats, error) {
 }
 
 type cpuSample struct {
-	idle  uint64
-	total uint64
+	idle  float64
+	total float64
 }
 
 // sampleCPU gets the idle and total ticks for each CPU.
 // This parses the /proc/stat file (documented here: https://www.kernel.org/doc/Documentation/filesystems/proc.txt).
 func sampleCPU() ([]cpuSample, error) {
-	stat, err := linux.ReadStat("/proc/stat")
+	cputimes, err := gopsutil.CPUTimes(true)
 	if err != nil {
 		return nil, err
 	}
-	s := make([]cpuSample, len(stat.CPUStats))
-	for i, c := range stat.CPUStats {
-		s[i].total = c.User + c.Nice + c.System + c.Idle + c.IOWait + c.IRQ +
-			c.SoftIRQ + c.Steal + c.Guest + c.GuestNice
-		s[i].idle = c.Idle + c.IOWait
+	samples := []cpuSample{}
+	for _, c := range cputimes {
+		if c.CPU == "cpu-total" { // Linux-only: ignore combined CPU times.
+			continue
+		}
+		s := cpuSample{}
+		s.total = float64(c.User) +
+			float64(c.System) +
+			float64(c.Idle) +
+			float64(c.Nice) +
+			float64(c.Iowait) +
+			float64(c.Irq) +
+			float64(c.Softirq) +
+			float64(c.Steal) +
+			float64(c.Guest) +
+			float64(c.GuestNice) +
+			float64(c.Stolen)
+		s.idle = float64(c.Idle) + float64(c.Iowait)
+		samples = append(samples, s)
 	}
-	return s, nil
+	return samples, nil
 }
 
 // cpuUsage computes per-CPU usage over the given period as percentages.
