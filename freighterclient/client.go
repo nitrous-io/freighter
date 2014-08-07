@@ -63,6 +63,7 @@ type Client interface {
 	Info(id string) (*Container, error)
 
 	Start(id string) (*Container, error)
+	StartWithConfig(id string, config *ContainerConfig) (*Container, error)
 	Stop(id string) (*Container, error)
 	Restart(id string) (*Container, error)
 	Terminate(id string) (*Container, error)
@@ -326,21 +327,34 @@ func (c *client) Info(id string) (*Container, error) {
 // with the given id. The Container is returned.
 // If the Container does not exist, ErrContainerNotFound is returned.
 func (c *client) Start(id string) (*Container, error) {
-	return c.containerControl(id, "start")
+	return c.containerControl(id, "start", nil)
+}
+
+func (c *client) StartWithConfig(id string, config *ContainerConfig) (*Container, error) {
+	data := &url.Values{}
+	if config != nil {
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return nil, err
+		}
+		data.Set("config", string(configJSON))
+	}
+
+	return c.containerControl(id, "start", data)
 }
 
 // Stop makes an API request to a given Freighter host to stop the Container
 // with the given id. The Container is returned.
 // If the Container does not exist, ErrContainerNotFound is returned.
 func (c *client) Stop(id string) (*Container, error) {
-	return c.containerControl(id, "stop")
+	return c.containerControl(id, "stop", nil)
 }
 
 // Restart makes an API request to a given Freighter host to restart the
 // Container with the given id. The Container is returned.
 // If the Container does not exist, ErrContainerNotFound is returned.
 func (c *client) Restart(id string) (*Container, error) {
-	return c.containerControl(id, "restart")
+	return c.containerControl(id, "restart", nil)
 }
 
 // Terminate makes an API request to a given Freighter host to terminate the
@@ -869,9 +883,13 @@ func (c *client) GetVolumeInfo(slug string) (*Volume, error) {
 	}
 }
 
-func (c *client) containerControl(id string, action string) (*Container, error) {
+func (c *client) containerControl(id string, action string, params *url.Values) (*Container, error) {
 	u := fmt.Sprintf("%s/containers/%s/%s", c.host.BaseURL(), id, action)
-	req, err := http.NewRequest("POST", u, nil)
+	var r io.Reader
+	if params != nil {
+		r = strings.NewReader(params.Encode())
+	}
+	req, err := http.NewRequest("POST", u, r)
 	if err != nil {
 		return nil, err
 	}

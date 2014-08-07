@@ -144,6 +144,20 @@ func (c *MockClient) Start(id string) (*Container, error) {
 	return cntnr, nil
 }
 
+// FIXME this is pure copypasta to pass tests for now
+func (c *MockClient) StartWithConfig(id string, config *ContainerConfig) (*Container, error) {
+	c.StartCalled = c.StartCalled + 1
+	c.ReceivedID = id
+	if c.StartError != nil {
+		return nil, c.StartError
+	}
+	cntnr, _ := c.Info(id)
+	if cntnr != nil {
+		cntnr.State = StateRunning
+	}
+	return cntnr, nil
+}
+
 func (c *MockClient) Stop(id string) (*Container, error) {
 	c.StopCalled = c.StopCalled + 1
 	c.ReceivedID = id
