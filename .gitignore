@@ -77,3 +77,6 @@ config.json
 # certificates
 *.crt
 *.key
+
+# build key
+.buildkey

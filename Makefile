@@ -42,4 +42,18 @@ run: build
 	@echo "$(OK_COLOR)==> Running...$(NO_COLOR)"
 	@.vendor/bin/$(BIN_NAME)
 
+certs:
+	$(eval CA ?= /etc/freighterd/ca.crt)
+	$(eval KEY ?= /etc/freighterd/key.crt)
+	$(eval CERT ?= /etc/freighterd/cert.crt)
+	@echo "$(OK_COLOR)==> Generating certs...$(NO_COLOR)"
+	openssl req -new \
+		-days 30 -x509 -extensions v3_ca -subj "/CN=freighterd.local/" \
+		-newkey rsa:2048 -nodes -keyout $(KEY) \
+		-out $(CA)
+	openssl req -new \
+		-days 30 -x509 -subj "/CN=freighterd.local/" \
+		-key $(KEY) \
+		-out $(CERT) >/dev/null
+
 .PHONY: all install-deps build format test run
