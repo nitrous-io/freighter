@@ -64,6 +64,7 @@ type Client interface {
 	List() ([]*Container, error)
 	Create(name, image, secret string, config *ContainerConfig) (*Container, error)
 	Commit(id, image string) (*Image, error)
+	Reconfig(id string, config *ContainerConfig) (*Container, error)
 
 	// Info returns the Container with the given id.
 	// If there is no Container with the given id, Info should return
@@ -291,6 +292,21 @@ func (c *client) Commit(id, imageName string) (*Image, error) {
 	}
 
 	return imageInfo.Image, nil
+}
+
+func (c *client) Reconfig(id string, config *ContainerConfig) (*Container, error) {
+	imageName := fmt.Sprintf("%s%v-%v", provider.ReconfigPrefix, id, time.Now().Unix())
+	image, err := c.Commit(id, imageName)
+	if err != nil {
+		return nil, err
+	}
+
+	container, err := c.Terminate(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.Create(container.Name, image.Name, config)
 }
 
 // Info makes an API request to a given Freighter Host and returns the

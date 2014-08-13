@@ -20,6 +20,10 @@ type MockClient struct {
 	CommitImage  *Image
 	CommitError  error
 
+	ReconfigCalled    int
+	ReconfigContainer *Container
+	ReconfigError     error
+
 	InfoCalled int
 	InfoError  error
 
@@ -134,6 +138,13 @@ func (c *MockClient) Commit(id, imageName string) (*Image, error) {
 	c.ReceivedID = id
 	c.ReceivedName = imageName
 	return c.CommitImage, c.CommitError
+}
+
+func (c *MockClient) Reconfig(id string, config *ContainerConfig) (*Container, error) {
+	c.ReconfigCalled += 1
+	c.ReceivedID = id
+	c.ReceivedConfig = config
+	return c.ReconfigContainer, c.ReconfigError
 }
 
 func (c *MockClient) Info(id string) (*Container, error) {
