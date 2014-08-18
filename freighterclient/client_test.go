@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/nitrous-io/freighter/freighterclient"
 	"github.com/nitrous-io/freighter/provider"
@@ -22,6 +23,7 @@ type ServerTest struct {
 	host      *freighterclient.Host
 	server    *ghttp.Server
 	handlerFn http.HandlerFunc
+	tp        *http.Transport
 }
 
 func NewServerTest(handlerFn http.HandlerFunc) (*ServerTest, error) {
@@ -29,16 +31,26 @@ func NewServerTest(handlerFn http.HandlerFunc) (*ServerTest, error) {
 	return st.Setup()
 }
 
+func NewServerTestTransport(fn http.HandlerFunc, tp *http.Transport) (*ServerTest, error) {
+	st := &ServerTest{handlerFn: fn, tp: tp}
+	return st.Setup()
+}
+
 func (st *ServerTest) Setup() (*ServerTest, error) {
-	st.server = ghttp.NewServer()
+	st.server = ghttp.NewTLSServer()
 	st.server.AppendHandlers(st.handlerFn)
 
 	ip, port, err := ipAndPort(st.server)
 	if err != nil {
 		return nil, err
 	}
-	host := freighterclient.NewHost(ip, port, "example.com")
-	client := freighterclient.NewClient(host)
+
+	host := freighterclient.NewHost(ip, port, "example.com", localhostCert,
+		localhostCert, localhostKey)
+	client, err := freighterclient.NewClientTransport(host, st.tp)
+	if err != nil {
+		return nil, err
+	}
 
 	st.host = host
 	st.client = client
@@ -73,6 +85,28 @@ var _ = Describe("client", func() {
 		statusCode   int
 		responseBody string
 	)
+
+	Describe("NewClientHTTP", func() {
+		It("times out a long request", func() {
+			handlers := ghttp.CombineHandlers(
+				func(w http.ResponseWriter, r *http.Request) {
+					time.Sleep(1 * time.Millisecond)
+					w.Write([]byte(`{"status": "toolong"}`))
+				},
+			)
+			tp := &http.Transport{
+				Dial: (&net.Dialer{
+					Timeout: 1 * time.Nanosecond,
+				}).Dial,
+			}
+			st, _ := NewServerTestTransport(handlers, tp)
+			defer st.Close()
+
+			_, err := st.client.List()
+			_, ok := err.(*freighterclient.RequestFailedError)
+			Expect(ok).To(BeTrue(), "should receive RequestFailedError")
+		})
+	})
 
 	Describe("List()", func() {
 		BeforeEach(func() {
@@ -1741,3 +1775,34 @@ var _ = Describe("client", func() {
 		})
 	})
 })
+
+// These certs are the same as the certs embeded with net/http/httptest.
+// If there's mismatched certs error, look at net/http/httptest/server.go to
+// check if the cert has changed.
+//
+// localhostCert is a PEM-encoded TLS cert with SAN IPs
+// "127.0.0.1" and "[::1]", expiring at the last second of 2049 (the end
+// of ASN.1 time).
+// generated from src/pkg/crypto/tls:
+// go run generate_cert.go  --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIBdzCCASOgAwIBAgIBADALBgkqhkiG9w0BAQUwEjEQMA4GA1UEChMHQWNtZSBD
+bzAeFw03MDAxMDEwMDAwMDBaFw00OTEyMzEyMzU5NTlaMBIxEDAOBgNVBAoTB0Fj
+bWUgQ28wWjALBgkqhkiG9w0BAQEDSwAwSAJBAN55NcYKZeInyTuhcCwFMhDHCmwa
+IUSdtXdcbItRB/yfXGBhiex00IaLXQnSU+QZPRZWYqeTEbFSgihqi1PUDy8CAwEA
+AaNoMGYwDgYDVR0PAQH/BAQDAgCkMBMGA1UdJQQMMAoGCCsGAQUFBwMBMA8GA1Ud
+EwEB/wQFMAMBAf8wLgYDVR0RBCcwJYILZXhhbXBsZS5jb22HBH8AAAGHEAAAAAAA
+AAAAAAAAAAAAAAEwCwYJKoZIhvcNAQEFA0EAAoQn/ytgqpiLcZu9XKbCJsJcvkgk
+Se6AbGXgSlq+ZCEVo0qIwSgeBqmsJxUu7NCSOwVJLYNEBO2DtIxoYVk+MA==
+-----END CERTIFICATE-----`)
+
+// localhostKey is the private key for localhostCert.
+var localhostKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIBPAIBAAJBAN55NcYKZeInyTuhcCwFMhDHCmwaIUSdtXdcbItRB/yfXGBhiex0
+0IaLXQnSU+QZPRZWYqeTEbFSgihqi1PUDy8CAwEAAQJBAQdUx66rfh8sYsgfdcvV
+NoafYpnEcB5s4m/vSVe6SU7dCK6eYec9f9wpT353ljhDUHq3EbmE4foNzJngh35d
+AekCIQDhRQG5Li0Wj8TM4obOnnXUXf1jRv0UkzE9AHWLG5q3AwIhAPzSjpYUDjVW
+MCUXgckTpKCuGwbJk7424Nb8bLzf3kllAiA5mUBgjfr/WtFSJdWcPQ4Zt9KTMNKD
+EUO0ukpTwEIl6wIhAMbGqZK3zAAFdq8DD2jPx+UJXnh0rnOkZBzDtJ6/iN69AiEA
+1Aq8MJgTaYsDQWyU/hDq5YkDJc9e9DSCvUIzqxQWMQE=
+-----END RSA PRIVATE KEY-----`)

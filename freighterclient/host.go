@@ -14,9 +14,14 @@ type Host struct {
 	// this must be the same as the server name we used to generate
 	// certificates
 	ServerName string
+
+	// PEM encoded version of certificate that is requires for authentication
+	CA   []byte
+	Cert []byte
+	Key  []byte
 }
 
-func NewHost(host string, port int, name string) *Host {
+func NewHost(host string, port int, name string, ca, cert, key []byte) *Host {
 	if port == 0 {
 		port = defaultPort
 	}
@@ -24,6 +29,9 @@ func NewHost(host string, port int, name string) *Host {
 		Host:       host,
 		Port:       port,
 		ServerName: name,
+		CA:         ca,
+		Cert:       cert,
+		Key:        key,
 	}
 }
 
@@ -32,5 +40,5 @@ func (h *Host) BaseURL() string {
 	if port == 0 {
 		port = 65333
 	}
-	return fmt.Sprintf("http://%s:%d", h.Host, port)
+	return fmt.Sprintf("https://%s:%d", h.Host, port)
 }

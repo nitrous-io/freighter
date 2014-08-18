@@ -1,7 +1,10 @@
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -18,7 +21,11 @@ var DefaultConfig *Config
 
 func init() {
 	DefaultConfig = &Config{
-		DataPath: "/var/lib/freighter",
+		DataPath:  "/var/lib/freighter",
+		TLSVerify: true,
+		CA:        "/etc/freighterd/ca.crt",
+		Cert:      "/etc/freighterd/cert.crt",
+		Key:       "/etc/freighterd/key.crt",
 
 		Listen: []HostAddress{
 			{Proto: "unix", Address: "/var/run/freighterd.sock"},
@@ -38,6 +45,11 @@ type HostAddress struct {
 // server config
 type Config struct {
 	DataPath string `json:"data_path"`
+
+	TLSVerify bool   `json:"tls_verify"` // whether we want to use TLS mode for all HTTP hosts
+	CA        string `json:"tls_ca"`     // path to CA
+	Cert      string `json:"tls_cert"`   // path to cert
+	Key       string `json:"tls_key"`    // path to key
 
 	Listen []HostAddress `json:"listen"`
 }
@@ -110,6 +122,13 @@ func (s *Server) serveTCP(proto, addr string) error {
 	if err != nil {
 		return fmt.Errorf("server: cannot listen to tcp %v, %v", addr, err)
 	}
+	if s.conf.TLSVerify {
+		tlsConfig, err := getTLSConfig(s.conf.CA, s.conf.Cert, s.conf.Key)
+		if err != nil {
+			return fmt.Errorf("server: invalid tls configs %v", err)
+		}
+		l = tls.NewListener(l, tlsConfig)
+	}
 	svr := &http.Server{Addr: addr, Handler: s.router}
 	return svr.Serve(l)
 }
@@ -164,4 +183,33 @@ func (s *Server) drawRoutes() {
 	s.route("/volumes/{slug}", s.wrapError(s.getVolumeInfo), "GET")
 
 	s.route("/info", s.wrapError(s.serverInfo), "GET")
+}
+
+// given:
+// - a certificate authority
+// - a certificate signed by the CA
+// - a private key for the certificate
+// return a proper tls config that can be used with tls.NewListener to secure a
+// net.Listener
+func getTLSConfig(caPath, certPath, keyPath string) (*tls.Config, error) {
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't load X509 key pair (%s, %s): %s. Key encrypted?",
+			certPath, keyPath, err)
+	}
+	file, err := ioutil.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't read CA certificate %s: %s", caPath, err)
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(file)
+
+	tlsConfig := &tls.Config{
+		NextProtos:   []string{"http/1.1"},
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    certPool,
+	}
+
+	return tlsConfig, nil
 }
