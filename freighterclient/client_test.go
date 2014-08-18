@@ -48,6 +48,7 @@ func (st *ServerTest) Setup() (*ServerTest, error) {
 	host := freighterclient.NewHost(ip, port, "example.com", localhostCert,
 		localhostCert, localhostKey)
 	client, err := freighterclient.NewClientTransport(host, st.tp)
+
 	if err != nil {
 		return nil, err
 	}
