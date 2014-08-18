@@ -204,10 +204,12 @@ func getTLSConfig(caPath, certPath, keyPath string) (*tls.Config, error) {
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(file)
 
+	// by default, we dont require any client cert i.e. no authentication
+	// as long as the client supplies the correct CA, it's allowed to talk to
+	// the server's endpoints
 	tlsConfig := &tls.Config{
 		NextProtos:   []string{"http/1.1"},
 		Certificates: []tls.Certificate{cert},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    certPool,
 	}
 

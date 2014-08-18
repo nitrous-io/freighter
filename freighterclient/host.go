@@ -16,12 +16,10 @@ type Host struct {
 	ServerName string
 
 	// PEM encoded version of certificate that is requires for authentication
-	CA   []byte
-	Cert []byte
-	Key  []byte
+	CA []byte
 }
 
-func NewHost(host string, port int, name string, ca, cert, key []byte) *Host {
+func NewHost(host string, port int, name string, ca []byte) *Host {
 	if port == 0 {
 		port = defaultPort
 	}
@@ -30,8 +28,6 @@ func NewHost(host string, port int, name string, ca, cert, key []byte) *Host {
 		Port:       port,
 		ServerName: name,
 		CA:         ca,
-		Cert:       cert,
-		Key:        key,
 	}
 }
 

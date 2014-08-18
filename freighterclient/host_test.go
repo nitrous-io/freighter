@@ -9,7 +9,7 @@ import (
 var _ = Describe("freighterclient/host", func() {
 	Describe("NewHost()", func() {
 		It("sets port to 65343 by default", func() {
-			h := freighterclient.NewHost("127.0.0.1", 0, "slug.nitrouspro.com", nil, nil, nil)
+			h := freighterclient.NewHost("127.0.0.1", 0, "slug.nitrouspro.com", nil)
 			Expect(h.Port).To(Equal(65343))
 		})
 	})
