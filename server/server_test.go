@@ -29,6 +29,30 @@ func Test(t *testing.T) {
 	RunSpecs(t, "server")
 }
 
+type nitrousServer struct {
+	*httptest.Server
+	authed bool
+}
+
+func (ns *nitrousServer) authEndpoint() string {
+	return ns.URL + "/api/v0/user"
+}
+
+func newNitrousServer() *nitrousServer {
+	ns := &nitrousServer{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Expect(r.Method).To(Equal("GET"))
+		Expect(r.URL.Path).To(Equal("/api/v0/user"))
+		// AuthToken is defined in pkg test. This is why i dont favor dot
+		// importing because it's not readable most of the times.
+		Expect(r.Header.Get("Authorization")).To(Equal("Bearer "+AuthToken), "failed to provide correct auth token")
+		ns.authed = true
+		w.Write([]byte(`{"user": {}}`))
+	}))
+	ns.Server = srv
+	return ns
+}
+
 var _ = Describe("server", func() {
 	var (
 		handler *mux.Router
@@ -38,17 +62,27 @@ var _ = Describe("server", func() {
 		svr     *server.Server
 		prov    *MockProvider
 		config  *server.Config
+
+		ns *nitrousServer
 	)
 
 	configJSON := `{"HostConfig": {"PortBindings": {"3000/tcp": [{"HostPort":"1234", "HostIp": "127.0.0.1"}]}}}`
 
 	BeforeEach(func() {
+		ns = newNitrousServer()
 		prov = &MockProvider{}
-		config = &server.Config{}
+		config = &server.Config{
+			AuthURL: ns.authEndpoint(),
+		}
 		logger := &util.Logger{Level: util.LogLevelQuiet}
 		svr = server.NewServer(logger, prov, config)
 		handler = svr.Router()
 		res = httptest.NewRecorder()
+	})
+
+	AfterEach(func() {
+		Expect(ns.authed).To(BeTrue(), "failed to perform authentication against nitrous server")
+		ns.Close()
 	})
 
 	Describe("GET /", func() {

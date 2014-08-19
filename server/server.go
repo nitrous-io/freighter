@@ -21,6 +21,7 @@ var DefaultConfig *Config
 
 func init() {
 	DefaultConfig = &Config{
+		AuthURL:   "https://localhost:3000/api/v0/user",
 		DataPath:  "/var/lib/freighter",
 		TLSVerify: true,
 		CA:        "/etc/freighterd/ca.crt",
@@ -44,6 +45,8 @@ type HostAddress struct {
 
 // server config
 type Config struct {
+	// we ping this url with the auth token to check if the token is valid
+	AuthURL  string `json:"auth_url"`
 	DataPath string `json:"data_path"`
 
 	TLSVerify bool   `json:"tls_verify"` // whether we want to use TLS mode for all HTTP hosts
@@ -140,6 +143,33 @@ func (s *Server) Router() *mux.Router {
 func (s *Server) route(route string, handler http.HandlerFunc, methods ...string) {
 	h := func(w http.ResponseWriter, r *http.Request) {
 		s.logger.Infof("Request: %v %v", r.Method, r.URL.String())
+		// perform authentication with the auth token
+		if s.conf.AuthURL == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"invalid nitrous.io authentication endpoint"}`))
+			return
+		}
+		authReq, err := http.NewRequest("GET", s.conf.AuthURL, nil)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"failed to set auth request"}`))
+			return
+		}
+		authReq.Header.Set("Authorization", r.Header.Get("Authorization"))
+		resp, err := http.DefaultClient.Do(authReq)
+		if err != nil {
+			s.logger.Errorf("failed to perform authentication %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"failed to perform authentication"}`))
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"invalid auth token"}`))
+			return
+		}
+		// authentication succeed, process the middleware as normal now
 		handler(w, r)
 	}
 	s.router.HandleFunc(route, h).Methods(methods...)
