@@ -39,6 +39,10 @@ var (
 	// ErrInvalidParams is returned when received a Unprocessable Entity (HTTP 422) response.
 	ErrInvalidParams = errors.New("freighter: invalid params")
 
+	// ErrInvalidAuthToken is returned when the user passed in an empty/invalid
+	// authentication token
+	ErrInvalidAuthToken = errors.New("freighter: invalid authentication token")
+
 	ErrEndpointNotFound  = errors.New("freighter: endpoint not found")
 	ErrContainerNotFound = errors.New("freighter: container not found")
 	ErrVolumeNotFound    = errors.New("freighter: volume not found")
@@ -171,20 +175,28 @@ func (e *StatusError) Error() string {
 }
 
 type client struct {
-	host *Host
+	authToken string
+	host      *Host
 	*http.Client
 }
 
 // NewClient returns a new Freighter API Client that can be used to communicate
 // with a freighterd instance on a host
-func NewClient(host *Host) (Client, error) {
-	return NewClientTransport(host, nil)
+func NewClient(host *Host, authToken string) (Client, error) {
+	return NewClientTransport(host, authToken, nil)
 }
 
 // NewClientTransport returns a new Freighter API Client that reuses an existing
 // transport but with new TLS config so it can be used to communicate with
 // a freighterd instance
-func NewClientTransport(host *Host, tp *http.Transport) (Client, error) {
+//
+// Note: if we use this method to customize the transport, make sure that we
+// are sending the correct authentication token because we customize the token
+// using proxy
+func NewClientTransport(host *Host, authToken string, tp *http.Transport) (Client, error) {
+	if authToken == "" {
+		return nil, ErrInvalidAuthToken
+	}
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(host.CA)
 	tlsConfig := &tls.Config{
@@ -194,7 +206,10 @@ func NewClientTransport(host *Host, tp *http.Transport) (Client, error) {
 
 	if tp == nil {
 		tp = &http.Transport{
-			Proxy: nil,
+			Proxy: func(req *http.Request) (*url.URL, error) {
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+				return nil, nil
+			},
 			Dial: (&net.Dialer{
 				KeepAlive: 10 * time.Second,
 			}).Dial,
@@ -205,7 +220,11 @@ func NewClientTransport(host *Host, tp *http.Transport) (Client, error) {
 	cl := &http.Client{
 		Transport: tp,
 	}
-	return &client{host: host, Client: cl}, nil
+	return &client{
+		authToken: authToken,
+		host:      host,
+		Client:    cl,
+	}, nil
 }
 
 // List makes an API request to a given Freighter Host and returns a list of

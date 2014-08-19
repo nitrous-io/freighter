@@ -45,9 +45,8 @@ func (st *ServerTest) Setup() (*ServerTest, error) {
 		return nil, err
 	}
 
-	host := freighterclient.NewHost(ip, port, "example.com", localhostCert,
-		localhostCert, localhostKey)
-	client, err := freighterclient.NewClientTransport(host, st.tp)
+	host := freighterclient.NewHost(ip, port, "example.com", localhostCert)
+	client, err := freighterclient.NewClientTransport(host, "authtoken", st.tp)
 
 	if err != nil {
 		return nil, err
@@ -86,6 +85,21 @@ var _ = Describe("client", func() {
 		statusCode   int
 		responseBody string
 	)
+
+	It("includes authentication token in the requests", func() {
+		handlers := ghttp.CombineHandlers(
+			ghttp.VerifyHeaderKV("Authorization", "Bearer authtoken"),
+			func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte(`{"containers":[]}`))
+			},
+		)
+		st, _ := NewServerTest(handlers)
+		defer st.Close()
+
+		containers, err := st.client.List()
+		Expect(containers).To(BeEmpty())
+		Expect(err).To(BeNil())
+	})
 
 	Describe("NewClientHTTP", func() {
 		It("times out a long request", func() {
