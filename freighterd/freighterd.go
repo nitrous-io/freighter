@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -97,4 +100,33 @@ func setPid(logger *util.Logger, dataPath string) int {
 		logger.FatalExit(err)
 	}
 	return pid
+}
+
+// given:
+// - a certificate authority
+// - a certificate signed by the CA
+// - a private key for the certificate
+// return a proper tls config that can be used with tls.NewListener to secure a
+// net.Listener
+func getTLSConfig(logger *util.Logger, caPath, certPath, keyPath string) *tls.Config {
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		logger.FatalExit(fmt.Errorf(
+			"Couldn't load X509 key pair (%s, %s): %s. Key encrypted?",
+			certPath, keyPath, err))
+	}
+	tlsConfig := &tls.Config{
+		NextProtos:   []string{"http/1.1"},
+		Certificates: []tls.Certificate{cert},
+	}
+	certPool := x509.NewCertPool()
+	file, err := ioutil.ReadFile(caPath)
+	if err != nil {
+		logger.FatalExit(fmt.Errorf("Couldn't read CA certificate %s: %s", caPath, err))
+	}
+	certPool.AppendCertsFromPEM(file)
+
+	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	tlsConfig.ClientCAs = certPool
+	return tlsConfig
 }

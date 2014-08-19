@@ -2,15 +2,19 @@ package freighterclient
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nitrous-io/freighter/provider"
 )
@@ -34,6 +38,10 @@ var (
 
 	// ErrInvalidParams is returned when received a Unprocessable Entity (HTTP 422) response.
 	ErrInvalidParams = errors.New("freighter: invalid params")
+
+	// ErrInvalidAuthToken is returned when the user passed in an empty/invalid
+	// authentication token
+	ErrInvalidAuthToken = errors.New("freighter: invalid authentication token")
 
 	ErrEndpointNotFound  = errors.New("freighter: endpoint not found")
 	ErrContainerNotFound = errors.New("freighter: container not found")
@@ -167,16 +175,56 @@ func (e *StatusError) Error() string {
 }
 
 type client struct {
-	host *Host
+	authToken string
+	host      *Host
 	*http.Client
 }
 
 // NewClient returns a new Freighter API Client that can be used to communicate
 // with a freighterd instance on a host
-func NewClient(host *Host) Client {
-	cl := &http.Client{}
+func NewClient(host *Host, authToken string) (Client, error) {
+	return NewClientTransport(host, authToken, nil)
+}
 
-	return &client{host: host, Client: cl}
+// NewClientTransport returns a new Freighter API Client that reuses an existing
+// transport but with new TLS config so it can be used to communicate with
+// a freighterd instance
+//
+// Note: if we use this method to customize the transport, make sure that we
+// are sending the correct authentication token because we customize the token
+// using proxy
+func NewClientTransport(host *Host, authToken string, tp *http.Transport) (Client, error) {
+	if authToken == "" {
+		return nil, ErrInvalidAuthToken
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(host.CA)
+	tlsConfig := &tls.Config{
+		ServerName: host.ServerName,
+		RootCAs:    certPool,
+	}
+
+	if tp == nil {
+		tp = &http.Transport{
+			Proxy: func(req *http.Request) (*url.URL, error) {
+				req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+				return nil, nil
+			},
+			Dial: (&net.Dialer{
+				KeepAlive: 10 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+		}
+	}
+	tp.TLSClientConfig = tlsConfig
+	cl := &http.Client{
+		Transport: tp,
+	}
+	return &client{
+		authToken: authToken,
+		host:      host,
+		Client:    cl,
+	}, nil
 }
 
 // List makes an API request to a given Freighter Host and returns a list of

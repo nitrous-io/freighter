@@ -33,6 +33,8 @@ udXHosgCgYBol+1yshjScPQbHvu6Pua721KvS6IDcj+TuyIds0nuhhkO8Wo+AGY6
 
 const TestSSHPubKey = `ssh-dss AAAAB3NzaC1kc3MAAACBANy3NoaVYLybgkOJyzOH2chzkt1+faRwgS223g0pWo07Y/3ch6qEg4t278P8i83N+xHZFFG+/DVOumieOcbRSsLSo0bpr8ElXVy6RH3tCHsaTI11IkVsyAhrIs1eWNaHx9Sy+afIZCBD51qjBMSBD5+iCoI30miMiP7ziLe0aTr5AAAAFQC4DXGwyI11HSb+vcOaxqSfyqnH6QAAAIAVOCjqVTxsADIQksyRKor/q8xHm2T/SSWYqfHiXB++PSBhIgtWHP2w7J+wLIUJ35Vm5e2aLooqLgIhrpS7klNux8PA2CJfsz+ubvKBntOjeeLWQADJlyDOMh9tpBWfrOoa25u2KnEcXX0IA7suRLLH+gWINsET7TcpBpu51ceiyAAAAIBol+1yshjScPQbHvu6Pua721KvS6IDcj+TuyIds0nuhhkO8Wo+AGY66FwRgwPWGBsI3C+Fybv0x+s8ndEPg9GapFkW6rntq8idhSqA2pTcSphFl/+OTirH1mYqJh5IhnW8NVs1zNeyyaYpk9ZKdGbOJIbpRQhHnFzwrJ/Fwhv6NA== test@example.com`
 
+const AuthToken = "nitrous-authtoken"
+
 func NewRequest(method string, urlStr string, params *url.Values) (*http.Request, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
@@ -41,14 +43,21 @@ func NewRequest(method string, urlStr string, params *url.Values) (*http.Request
 	if params != nil {
 		u.RawQuery = params.Encode()
 	}
-	return http.NewRequest(method, u.String(), nil)
+	req, err := http.NewRequest(method, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+AuthToken)
+	return req, nil
 }
 
 func NewFormRequest(method string, urlStr string, params *url.Values) (*http.Request, error) {
 	req, err := http.NewRequest(method, urlStr, strings.NewReader(params.Encode()))
-	if err == nil {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err != nil {
+		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+AuthToken)
 	return req, err
 }
 
@@ -77,6 +86,7 @@ func NewFileRequest(method string, urlStr string, params map[string]string, file
 		return nil, err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+AuthToken)
 	return req, nil
 }
 
