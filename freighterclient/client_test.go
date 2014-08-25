@@ -495,7 +495,7 @@ var _ = Describe("client", func() {
 		Context("when all calls are successful", func() {
 			It("returns new container info", func() {
 				config := &freighterclient.ContainerConfig{Env: []string{"PAGER=most"}}
-				container, err := cl.Reconfig("mycon", config)
+				container, err := cl.Reconfig("mycon", "s3cr3t", config)
 				Expect(err).To(BeNil())
 				Expect(container).To(Equal(&freighterclient.Container{
 					ID:    "ff7048snip",
@@ -527,7 +527,7 @@ var _ = Describe("client", func() {
 
 			It("returns internal server error", func() {
 				config := &freighterclient.ContainerConfig{Env: []string{"PAGER=most"}}
-				container, err := cl.Reconfig("mycon", config)
+				container, err := cl.Reconfig("mycon", "s3cr3t", config)
 				Expect(err).To(MatchError(&freighterclient.StatusError{
 					Code: http.StatusInternalServerError,
 				}))
@@ -544,7 +544,7 @@ var _ = Describe("client", func() {
 
 			It("returns internal server error", func() {
 				config := &freighterclient.ContainerConfig{Env: []string{"PAGER=most"}}
-				container, err := cl.Reconfig("mycon", config)
+				container, err := cl.Reconfig("mycon", "s3cr3t", config)
 				Expect(err).To(MatchError(&freighterclient.StatusError{
 					Code: http.StatusInternalServerError,
 				}))

@@ -140,10 +140,11 @@ func (c *MockClient) Commit(id, imageName string) (*Image, error) {
 	return c.CommitImage, c.CommitError
 }
 
-func (c *MockClient) Reconfig(id string, config *ContainerConfig) (*Container, error) {
+func (c *MockClient) Reconfig(id, secret string, config *ContainerConfig) (*Container, error) {
 	c.ReconfigCalled += 1
 	c.ReceivedID = id
 	c.ReceivedConfig = config
+	c.ReceivedSecret = secret
 	return c.ReconfigContainer, c.ReconfigError
 }
 
