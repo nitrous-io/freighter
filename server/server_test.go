@@ -148,12 +148,31 @@ var _ = Describe("server", func() {
 				Context("returns an error", func() {
 					BeforeEach(func() {
 						prov.CreateError = errors.New("pc load letter")
-						doRequest()
 					})
 
 					It("responds with 500 Internal Server Error", func() {
+						doRequest()
 						Expect(res.Code).To(Equal(http.StatusInternalServerError))
 						Expect(res.Body.String()).To(MatchJSON(`{"error":"pc load letter"}`))
+					})
+				})
+
+				Context("returns a provider.StartFailedError", func() {
+					BeforeEach(func() {
+						prov.CreateContainerInfo = &provider.ContainerInfo{ID: "aaa", Name: name, Image: "ubuntu", ImageID: "abc123", Host: "", Gateway: "", State: provider.ContainerStateStopped}
+						prov.CreateError = &provider.StartFailedError{Err: errors.New("start failed")}
+					})
+
+					It("responds with 200 OK with container info and the error", func() {
+						doRequest()
+						Expect(res.Code).To(Equal(http.StatusOK))
+						Expect(res.Body.String()).To(MatchJSON(fmt.Sprintf(`{
+							"container":{
+								"id":"aaa","name":"fragrant-wind-69","image":"ubuntu","image_id":"abc123","host":"","gateway":"","state":"stopped","ports": null,"exit_code":0,"started_at":"0001-01-01T00:00:00Z","finished_at":"0001-01-01T00:00:00Z"
+							},
+							"status":"start_failed",
+							"error":"%s"
+						}`, prov.CreateError)))
 					})
 				})
 

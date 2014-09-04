@@ -143,6 +143,19 @@ HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
 { "container" : { "id":"aaa", "name":"fragrant-wind-69", "image":"ubuntu", "host":"1.2.3.4", "ssh_port":10000, "state":"running", "ports":{"1234":3000,"49123":8080,"49273":22} }
+
+If the container is created but couldn't be started, a "status" of
+"start_failed" is included together with an "error" field:
+
+```javascript
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+
+{
+  "container": { "id":"aaa", "name":"fragrant-wind-69", "image":"ubuntu", "host":"1.2.3.4", "ssh_port":10000, "state":"running", "ports":{"1234":3000,"49123":8080,"49273":22},
+  "status": "start_failed",
+  "error": "start failed: could not allocate port 3000"
+}
 ```
 
 **POST Params**:

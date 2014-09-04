@@ -81,13 +81,20 @@ func (s *Server) createContainer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	info, err := s.provider.Create(name, image, secret, r.FormValue("config"))
-
 	if err != nil {
-		s.logger.Error(err)
+		if _, ok := err.(*provider.StartFailedError); ok {
+			s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{
+				"container": info,
+				"status":    "start_failed",
+				"error":     err.Error(),
+			})
+			return
+		}
 		s.respondEncodeJSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
-	} else {
-		s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"container": info})
+		return
 	}
+
+	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{"container": info})
 }
 
 func (s *Server) commitContainer(w http.ResponseWriter, r *http.Request) {
