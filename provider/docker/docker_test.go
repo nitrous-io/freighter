@@ -169,8 +169,7 @@ var _ = Describe("provider/docker", func() {
 			host = getHost(id)
 			port = getPort(id)
 
-			userPubkey := TestSSHPubKey
-			pubkey2 = strings.TrimSpace(string(userPubkey))
+			pubkey2 = TestSSHPubKey
 			fingerprint2, err = util.Md5Fingerprint(pubkey2)
 			Expect(err).To(BeNil())
 
@@ -183,7 +182,7 @@ var _ = Describe("provider/docker", func() {
 			os.Remove(sshkeypath)
 		})
 
-		It("creates a container successfully", func() {
+		It("creates and starts container successfully", func() {
 			Expect(info.ID).To(Equal(id))
 			Expect(info.Name).To(Equal(name))
 			Expect(info.Image).To(Equal(image))
@@ -213,6 +212,20 @@ var _ = Describe("provider/docker", func() {
 			Expect(fi.Mode()).To(Equal(os.FileMode(0600))) // shared secret file has perm 0600
 			s, err := ioutil.ReadFile(sharedSecretFile)
 			Expect(string(s)).To(Equal(secret))
+		})
+
+		Context("when container cannot be started", func() {
+			It("creates a stopped container successfully (i.e. no error returned)", func() {
+				// Create container with config that prevents it from
+				// started.
+				name := RandomName("freightertest")
+				info, err := prov.Create(name, image, secret,
+					`{"PortBindings": ["127.0.0.1:99999:99999"]}`) // Port out of range.
+				Expect(err).To(BeNil())
+				defer cleanUpContainer(name)
+				Expect(info.Name).To(Equal(name))
+				Expect(info.State).To(Equal(provider.ContainerStateStopped))
+			})
 		})
 
 		Context("after container is created", func() {
