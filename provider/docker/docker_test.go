@@ -1126,15 +1126,21 @@ var _ = Describe("provider/docker", func() {
 			})
 
 			It("should break them out into separate entries", func() {
-				imageList, err := prov.ListImages()
+				images, err := prov.ListImages()
 				Expect(err).To(BeNil())
 
-				i1 := imageList[0]
-				i2 := imageList[1]
-				Expect(i1.Name).To(Equal("multiple"))
-				Expect(i2.Name).To(Equal("multiple"))
-				Expect(i1.Tag).To(Equal("n1"))
-				Expect(i2.Tag).To(Equal("n2"))
+				var i1, i2 *provider.ImageInfo
+				for _, i := range images {
+					if i.Name == "multiple" && i.Tag == "n1" {
+						i1 = i
+					}
+					if i.Name == "multiple" && i.Tag == "n2" {
+						i2 = i
+					}
+				}
+
+				Expect(i1).NotTo(BeNil())
+				Expect(i2).NotTo(BeNil())
 				Expect(i1.ID).To(Equal(i2.ID))
 			})
 		})
