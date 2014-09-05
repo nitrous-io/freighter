@@ -187,7 +187,7 @@ var _ = Describe("provider/docker", func() {
 			Expect(info.ImageID).To(Equal(getID(image)))
 			Expect(info.Host).To(Equal(host))
 			Expect(info.State).To(Equal(provider.ContainerStateRunning))
-			Expect(info.Ports[port]).To(Equal(22))
+			Expect(info.Ports["22"]).To(ContainElement(port))
 
 			c := getContainerInfo(id)
 			Expect(info.Cmd).To(Equal(c.Config.Cmd))
@@ -231,21 +231,16 @@ var _ = Describe("provider/docker", func() {
 				var (
 					container2Name string
 					container2Info *provider.ContainerInfo
-					container2Port string
 				)
 
 				BeforeEach(func() {
+					// Create another container and stop it.
+					var err error
 					container2Name = RandomName("freightertest2")
-
-					// shut down first container
-					err := exec.Command("docker", "stop", id).Run()
-					Expect(err).To(BeNil())
-
-					// create another container
 					container2Info, err = prov.Create(container2Name, image, secret, "")
 					Expect(err).To(BeNil())
-
-					container2Port = getPort(container2Info.ID)
+					err = exec.Command("docker", "stop", container2Info.ID).Run()
+					Expect(err).To(BeNil())
 				})
 
 				AfterEach(func() {
@@ -256,44 +251,45 @@ var _ = Describe("provider/docker", func() {
 					It("returns a list of all containers running or stopped", func() {
 						list, err := prov.List()
 						Expect(err).To(BeNil())
-
 						Expect(list).To(HaveLen(2))
 
 						var stopped, running *provider.ContainerInfo
 						for _, c := range list {
 							if c.ID == id {
-								stopped = c
-							} else {
-								Expect(c.ID).To(Equal(container2Info.ID))
 								running = c
+							} else if c.ID == container2Info.ID {
+								stopped = c
 							}
 						}
 
 						imageID := getID(image)
-						Expect(stopped.ID).To(Equal(id))
-						Expect(stopped.Name).To(Equal(name))
+
+						Expect(stopped.ID).To(Equal(container2Info.ID))
+						Expect(stopped.Name).To(Equal(container2Name))
 						Expect(stopped.Image).To(Equal(image))
 						Expect(stopped.ImageID).To(Equal(imageID))
 						Expect(stopped.Host).To(Equal(""))
 						Expect(stopped.State).To(Equal(provider.ContainerStateStopped))
-						Expect(stopped.Ports[port]).To(Equal(22))
+						hostPorts, ok := stopped.Ports["22"]
+						Expect(ok).To(BeTrue())
+						Expect(hostPorts).To(HaveLen(0))
 
-						c := getContainerInfo(id)
+						c := getContainerInfo(container2Info.ID)
 						Expect(stopped.Cmd).To(Equal(c.Config.Cmd))
 						Expect(stopped.Entrypoint).To(Equal(c.Config.Entrypoint))
 						Expect(stopped.ExitCode).To(Equal(c.State.ExitCode))
 						Expect(stopped.StartedAt).To(Equal(c.State.StartedAt))
 						Expect(stopped.FinishedAt).To(Equal(c.State.FinishedAt))
 
-						Expect(running.ID).To(Equal(container2Info.ID))
-						Expect(running.Name).To(Equal(container2Name))
+						Expect(running.ID).To(Equal(id))
+						Expect(running.Name).To(Equal(name))
 						Expect(running.Image).To(Equal(image))
 						Expect(running.ImageID).To(Equal(imageID))
-						Expect(running.Host).To(Equal(container2Info.Host))
+						Expect(running.Host).To(Equal(host))
 						Expect(running.State).To(Equal(provider.ContainerStateRunning))
-						Expect(running.Ports[container2Port]).To(Equal(22))
+						Expect(running.Ports["22"]).To(ContainElement(port))
 
-						c = getContainerInfo(container2Info.ID)
+						c = getContainerInfo(id)
 						Expect(running.Cmd).To(Equal(c.Config.Cmd))
 						Expect(running.Entrypoint).To(Equal(c.Config.Entrypoint))
 						Expect(running.ExitCode).To(Equal(c.State.ExitCode))
@@ -303,66 +299,45 @@ var _ = Describe("provider/docker", func() {
 				})
 
 				Describe(".GetInfo()", func() {
-					Context("if a container with a given id is managed by freighter", func() {
-						It("returns container info", func() {
-							imageID := getID(image)
+					It("returns container info", func() {
+						imageID := getID(image)
 
-							info, err := prov.GetInfo(id)
-							Expect(err).To(BeNil())
-							Expect(info.ID).To(Equal(id))
-							Expect(info.Name).To(Equal(name))
-							Expect(info.Image).To(Equal(image))
-							Expect(info.ImageID).To(Equal(imageID))
-							Expect(info.Host).To(Equal(""))
-							Expect(info.Ports[port]).To(Equal(22))
-							Expect(info.State).To(Equal(provider.ContainerStateStopped))
+						info, err := prov.GetInfo(id)
+						Expect(err).To(BeNil())
+						Expect(info.ID).To(Equal(id))
+						Expect(info.Name).To(Equal(name))
+						Expect(info.Image).To(Equal(image))
+						Expect(info.ImageID).To(Equal(imageID))
+						Expect(info.Host).To(Equal(host))
+						Expect(info.State).To(Equal(provider.ContainerStateRunning))
+						Expect(info.Ports["22"]).To(ContainElement(port))
 
-							c := getContainerInfo(id)
-							Expect(info.Cmd).To(Equal(c.Config.Cmd))
-							Expect(info.Entrypoint).To(Equal(c.Config.Entrypoint))
-							Expect(info.ExitCode).To(Equal(c.State.ExitCode))
-							Expect(info.StartedAt).To(Equal(c.State.StartedAt))
-							Expect(info.FinishedAt).To(Equal(c.State.FinishedAt))
-
-							info, err = prov.GetInfo(container2Info.ID)
-							Expect(err).To(BeNil())
-							Expect(info.ID).To(Equal(container2Info.ID))
-							Expect(info.Name).To(Equal(container2Name))
-							Expect(info.Image).To(Equal(image))
-							Expect(info.ImageID).To(Equal(imageID))
-							Expect(info.Host).To(Equal(container2Info.Host))
-							Expect(info.Ports[container2Port]).To(Equal(22))
-							Expect(info.State).To(Equal(provider.ContainerStateRunning))
-
-							c = getContainerInfo(container2Info.ID)
-							Expect(info.Cmd).To(Equal(c.Config.Cmd))
-							Expect(info.Entrypoint).To(Equal(c.Config.Entrypoint))
-							Expect(info.ExitCode).To(Equal(c.State.ExitCode))
-							Expect(info.StartedAt).To(Equal(c.State.StartedAt))
-							Expect(info.FinishedAt).To(Equal(c.State.FinishedAt))
-						})
+						c := getContainerInfo(id)
+						Expect(info.Cmd).To(Equal(c.Config.Cmd))
+						Expect(info.Entrypoint).To(Equal(c.Config.Entrypoint))
+						Expect(info.ExitCode).To(Equal(c.State.ExitCode))
+						Expect(info.StartedAt).To(Equal(c.State.StartedAt))
+						Expect(info.FinishedAt).To(Equal(c.State.FinishedAt))
 					})
 				})
 			})
 
 			Describe(".Start()", func() {
-				var info *provider.ContainerInfo
-
 				expectContainerToBeRunning := func() {
 					out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 					Expect(err).To(BeNil())
 					Expect(out).To(ContainSubstring("true"))
 				}
 
-				expectContainerInfoToHaveBeenReturned := func() {
+				expectContainerInfoToHaveBeenReturned := func(info *provider.ContainerInfo) {
 					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
 					Expect(info.Name).To(Equal(name))
 					Expect(info.Image).To(Equal(image))
 					Expect(info.ImageID).To(Equal(getID(image)))
-					Expect(info.Host).To(Equal(host))
-					Expect(info.Ports[port]).To(Equal(22))
+					Expect(info.Host).To(Equal(getHost(id)))
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
+					Expect(info.Ports["22"]).To(ContainElement(getPort(id)))
 
 					c := getContainerInfo(id)
 					Expect(info.Cmd).To(Equal(c.Config.Cmd))
@@ -372,17 +347,12 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.FinishedAt).To(Equal(c.State.FinishedAt))
 				}
 
-				JustBeforeEach(func() {
-					var err error
-					info, err = prov.Start(id, "")
-					Expect(err).To(BeNil())
-					host = getHost(id)
-				})
-
 				Context("when the container is running", func() {
 					It("does nothing", func() {
+						info, err := prov.Start(id, "")
+						Expect(err).To(BeNil())
 						expectContainerToBeRunning()
-						expectContainerInfoToHaveBeenReturned()
+						expectContainerInfoToHaveBeenReturned(info)
 					})
 				})
 
@@ -393,8 +363,10 @@ var _ = Describe("provider/docker", func() {
 					})
 
 					It("starts the container", func() {
+						info, err := prov.Start(id, "")
+						Expect(err).To(BeNil())
 						expectContainerToBeRunning()
-						expectContainerInfoToHaveBeenReturned()
+						expectContainerInfoToHaveBeenReturned(info)
 					})
 				})
 			})
@@ -412,11 +384,13 @@ var _ = Describe("provider/docker", func() {
 					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
 					Expect(info.Host).To(Equal(""))
-					Expect(info.Ports[port]).To(Equal(22))
+					Expect(info.State).To(Equal(provider.ContainerStateStopped))
+					hostPorts, ok := info.Ports["22"]
+					Expect(ok).To(BeTrue())
+					Expect(hostPorts).To(HaveLen(0))
 					Expect(info.Name).To(Equal(name))
 					Expect(info.Image).To(Equal(image))
 					Expect(info.ImageID).To(Equal(getID(image)))
-					Expect(info.State).To(Equal(provider.ContainerStateStopped))
 
 					c := getContainerInfo(id)
 					Expect(info.Cmd).To(Equal(c.Config.Cmd))
@@ -454,14 +428,13 @@ var _ = Describe("provider/docker", func() {
 
 			Describe(".Restart()", func() {
 				expectContainerInfoToHaveBeenReturned := func(info *provider.ContainerInfo) {
-					Expect(info).NotTo(BeNil())
 					Expect(info.ID).To(Equal(id))
 					Expect(info.Name).To(Equal(name))
 					Expect(info.Image).To(Equal(image))
 					Expect(info.ImageID).To(Equal(getID(image)))
-					Expect(info.Host).To(Equal(host))
-					Expect(info.Ports[port]).To(Equal(22))
+					Expect(info.Host).To(Equal(getHost(id)))
 					Expect(info.State).To(Equal(provider.ContainerStateRunning))
+					Expect(info.Ports["22"]).To(ContainElement(getPort(id)))
 
 					c := getContainerInfo(id)
 					Expect(info.Cmd).To(Equal(c.Config.Cmd))
@@ -477,10 +450,10 @@ var _ = Describe("provider/docker", func() {
 						Expect(err).To(BeNil())
 						prevStartTime, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(out)))
 						Expect(err).To(BeNil())
-						info, err = prov.Restart(id)
+						info, err := prov.Restart(id)
 						Expect(err).To(BeNil())
-						host = getHost(id)
 						expectContainerInfoToHaveBeenReturned(info)
+
 						out, err = exec.Command("docker", "inspect", "-f", "{{.State.Running}}", id).CombinedOutput()
 						Expect(err).To(BeNil())
 						Expect(out).To(ContainSubstring("true"))
@@ -534,7 +507,7 @@ var _ = Describe("provider/docker", func() {
 					Expect(info.Image).To(Equal(image))
 					Expect(info.ImageID).To(Equal(getID(image)))
 					Expect(info.Host).To(Equal(""))
-					Expect(info.Ports).To(Equal(map[string]int{}))
+					Expect(info.Ports).To(BeEmpty())
 					Expect(info.State).To(Equal(""))
 
 					Expect(info.Cmd).To(Equal(cntnrInfo.Config.Cmd))
@@ -970,22 +943,16 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	Describe(".Create() with custom options", func() {
-		var (
-			name       string
-			info       *provider.ContainerInfo
-			configJSON string
-		)
-
 		// getPortBindings output looks like "[map[HostIp:127.0.0.1 HostPort:1234]]"
 		// or "<no value>" if bindings for given port do not exist
 		getPortBindings := func(id, port string) string {
 			return doInspect(id, fmt.Sprintf(
-				`{{index .HostConfig.PortBindings "%s"}}`, port))
+				`{{index .NetworkSettings.Ports "%s"}}`, port))
 		}
 
 		// given docker inspect output "Volumes": {
 		//   "/etc/dotfiles": "/var/lib/freighter/volumes/dotfiles",
-		//   "/voluems/backups": "/var/lib/freighter/volumes/backups"
+		//   "/volumes/backups": "/var/lib/freighter/volumes/backups"
 		// }
 		// returns
 		//   /etc/dotfiles /var/lib/freighter/volumes/dotfiles\n
@@ -995,23 +962,17 @@ var _ = Describe("provider/docker", func() {
 				"{{range $cnrPath, $hostPath := .Volumes}}{{$cnrPath}} {{$hostPath}}\n{{end}}")
 		}
 
-		BeforeEach(func() {
-			var err error
-			configJSON = `{
-  "Env": ["LANG=C"],
-  "Mounts": ["dotfiles:/etc/dotfiles","backups"],
-  "PortBindings": ["127.0.0.1:1234:3000"]
-}`
-			name = RandomName("freightertest")
-			info, err = prov.Create(name, image, secret, configJSON)
-			Expect(err).To(BeNil())
-		})
-
-		AfterEach(func() {
-			cleanUpContainer(name)
-		})
-
 		It("creates container with options", func() {
+			name := RandomName("freightertest")
+			configJSON := `{
+			  "Env": ["LANG=C"],
+			  "Mounts": ["dotfiles:/etc/dotfiles","backups"],
+			  "PortBindings": ["127.0.0.1:65000:3000"]
+			}`
+			info, err := prov.Create(name, image, secret, configJSON)
+			Expect(err).To(BeNil())
+			defer cleanUpContainer(name)
+
 			id := getID(name)
 			imageID := getID(image)
 			Expect(info.ID).To(Equal(id))
@@ -1023,10 +984,15 @@ var _ = Describe("provider/docker", func() {
 			Expect(doInspect(id,
 				"{{range $p, $stub := .Config.ExposedPorts}}{{$p}} {{end}}")).
 				To(Equal("22/tcp 3000"))
-			Expect(getPortBindings(id, "3000")).To(
-				Equal("[map[HostIp:127.0.0.1 HostPort:1234]]"))
-			Expect(getPortBindings(id, "22/tcp")).To(
-				ContainSubstring("[map[HostIp:0.0.0.0 HostPort:49")) // Docker will use 49000-49900
+
+			port3000Binding := getPortBindings(id, "3000")
+			Expect(port3000Binding).To(ContainSubstring("HostIp:127.0.0.1"))
+			Expect(port3000Binding).To(ContainSubstring("HostPort:65000"))
+
+			port22Binding := getPortBindings(id, "22/tcp")
+			Expect(port22Binding).To(ContainSubstring("HostIp:0.0.0.0"))
+			Expect(port22Binding).To(MatchRegexp(`HostPort:49[0-9][0-9][0-9]`)) // Docker will use 49000-49900
+
 			containerDir := filepath.Join(datadir, "containers")
 			volumeDir := filepath.Join(datadir, "volumes")
 			vols := getVolumes(id)
@@ -1039,12 +1005,13 @@ var _ = Describe("provider/docker", func() {
 
 			// should be split out but kept here due to each container create taking >10s
 			// It("persists PortBindings,Binds on next start if no options given")
-			_, err := prov.Stop(id)
+			_, err = prov.Stop(id)
 			Expect(err).To(BeNil())
 			_, err = prov.Start(id, "")
 			Expect(err).To(BeNil())
-			Expect(getPortBindings(id, "3000")).To(
-				Equal("[map[HostIp:127.0.0.1 HostPort:1234]]"))
+			port3000Binding = getPortBindings(id, "3000")
+			Expect(port3000Binding).To(ContainSubstring("HostIp:127.0.0.1"))
+			Expect(port3000Binding).To(ContainSubstring("HostPort:65000"))
 			vols = getVolumes(id)
 			Expect(vols).To(ContainSubstring("/etc/ssh/freighter"))
 			Expect(vols).To(ContainSubstring("dotfiles"))
@@ -1057,8 +1024,9 @@ var _ = Describe("provider/docker", func() {
 			newConfig = strings.Replace(newConfig, "backups", "restores", 1)
 			_, err = prov.Start(id, newConfig)
 			Expect(err).To(BeNil())
-			Expect(getPortBindings(id, "4242/tcp")).To(
-				Equal("[map[HostIp:127.0.0.1 HostPort:1234]]"))
+			port4242Binding := getPortBindings(id, "4242/tcp")
+			Expect(port4242Binding).To(ContainSubstring("HostIp:127.0.0.1"))
+			Expect(port4242Binding).To(ContainSubstring("HostPort:65000"))
 			Expect(getPortBindings(id, "3000/tcp")).To(Equal("<no value>"))
 			vols = getVolumes(id)
 			Expect(vols).To(ContainSubstring("/etc/ssh/freighter"))
@@ -1070,7 +1038,6 @@ var _ = Describe("provider/docker", func() {
 	})
 
 	Describe(".ListImages()", func() {
-
 		imageSize := func(id string) int64 {
 			sizeInspect := doInspect(id, "{{.Size}}")
 			parsedSize, err := strconv.ParseInt(sizeInspect, 10, 64)

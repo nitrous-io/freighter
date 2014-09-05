@@ -142,7 +142,7 @@ name=foo&image=ubuntu-upstart:trusty&config=JSON
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 
-{ "container" : { "id":"aaa", "name":"fragrant-wind-69", "image":"ubuntu", "host":"1.2.3.4", "ssh_port":10000, "state":"running", "ports":{"1234":3000,"49123":8080,"49273":22} }
+{ "container" : { "id":"aaa", "name":"fragrant-wind-69", "image":"ubuntu", "host":"1.2.3.4", "ssh_port":10000, "state":"running", "ports":{"3000": ["3000", "3001"],"8080":["49123"],"22":["49273"]} }
 ```
 
 **POST Params**:
@@ -160,7 +160,8 @@ All keys of config JSON are optional.  Fully populated JSON looks like:
     "Volumes": {"/data": {}, "/music": {}}
   }
   "HostConfig": {
-    "PortBindings": {"3000/tcp": [{"HostPort":"1234", "HostIp": "127.0.0.1"}]},
+    "PortBindings": {"3000/tcp": [{"HostPort":"3000", "HostIp": "127.0.0.1"}]},
+    "PortBindings": {"3000/tcp": [{"HostPort":"3001", "HostIp": "127.0.0.1"}]},
   }
 }
 ```
@@ -232,7 +233,7 @@ Content-Type: application/json; charset=utf-8
 		"host": "1.2.3.4",
 		"ssh_port": 1000,
 		"state": "running",
-		"ports": {"1234":3000,"49273":22}
+		"ports": {"3000":["3000", "3001"],"22":["49273"]}
 	}
 }
 ```
