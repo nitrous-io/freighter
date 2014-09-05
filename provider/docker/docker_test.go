@@ -62,11 +62,9 @@ var _ = Describe("provider/docker", func() {
 		exec.Command("docker", "rm", name).Run()
 	}
 
-	// Stolen from @ddollar's script here:
-	// https://github.com/nitrous-io/freighter/commit/c5ebce6afd9e5bdf0727c9f2c24dc818a39368be#diff-b57cb1684dfddcbd75f478574803cd36R10
 	doInspect := func(id, format string) string {
 		out, err := exec.Command("docker", "inspect", "-f", format, id).CombinedOutput()
-		Expect(err).To(BeNil())
+		Expect(err).To(BeNil(), "docker inspect -f %v %v failed with output: %v", format, id, string(out))
 		return strings.TrimSpace(string(out))
 	}
 
@@ -140,9 +138,9 @@ var _ = Describe("provider/docker", func() {
 	}
 
 	removeImages := func(names []string) {
-		args := append([]string{"rmi"}, names...)
-		err := exec.Command("docker", args...).Run()
-		Expect(err).To(BeNil())
+		args := append([]string{"rmi", "-f"}, names...)
+		out, err := exec.Command("docker", args...).CombinedOutput()
+		Expect(err).To(BeNil(), "Failed to remove images, output: %v", string(out))
 	}
 
 	Describe(".Create()", func() {
