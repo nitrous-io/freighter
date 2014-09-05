@@ -814,12 +814,16 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 
 	id := container.ID
 	p.logger.TimeInfo(start, "DockerProvider: created container", containerName, id, "in")
+
 	p.logger.Info("DockerProvider: starting container", containerName)
 	start = time.Now()
-
-	err = p.client.StartContainer(id, startConfig)
-
+	if err := p.client.StartContainer(id, startConfig); err != nil {
+		// Log and don't return an error.
+		p.logger.Errorf("DockerProvider: failed to start container %s: %v", containerName, err)
+		return container, nil
+	}
 	p.logger.TimeInfo(start, "DockerProvider: started container", containerName, id, "in")
+
 	return container, err
 }
 
