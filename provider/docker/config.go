@@ -15,87 +15,79 @@ var (
 	ErrInvalidMountSpec = fmt.Errorf("volume specification invalid")
 )
 
-// createConfigs returns the dockerclient Config and HostConfig needed to
-// create a container.  These can be customized by cfg ContainerConfig.
-func (p *DockerProvider) createConfigs(containerName, imageName string, cfg *provider.ContainerConfig) (*dockerclient.Config, *dockerclient.HostConfig, error) {
+func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig) (*dockerclient.Config, error) {
 	dcConfig := &dockerclient.Config{
-		Hostname:     containerName,
-		Image:        imageName,
+		Hostname:     cfg.Hostname,
+		Image:        cfg.Image,
 		Volumes:      map[string]struct{}{},
 		ExposedPorts: map[dockerclient.Port]struct{}{},
 		Env:          []string{},
 	}
-	dcHostConfig := &dockerclient.HostConfig{
-		Binds:           []string{},
-		PortBindings:    map[dockerclient.Port][]dockerclient.PortBinding{},
-		PublishAllPorts: true,
-	}
+
 	if cfg != nil {
 		dcConfig.Env = cfg.Env
 		bs, err := dockerPortBindings(cfg.PortBindings)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		dcHostConfig.PortBindings = bs
 		for port, _ := range bs {
 			dcConfig.ExposedPorts[dockerclient.Port(port)] = struct{}{}
 		}
-		ms, err := dockerMountBinds(cfg.Mounts, p.VolumesDir(""))
-		if err != nil {
-			return nil, nil, err
-		}
-		dcHostConfig.Binds = ms
 	}
 
-	if isNitrousImage(imageName) {
-		p.nitrousImageConfig(dcConfig, dcHostConfig)
+	if isNitrousImage(cfg.Image) {
+		dcConfig.ExposedPorts[dockerclient.Port("22/tcp")] = struct{}{}
+		dcConfig.Volumes["/etc/ssh/freighter"] = struct{}{}
 	}
 
-	return dcConfig, dcHostConfig, nil
+	return dcConfig, nil
 }
 
-// startConfig returns the dockerclient HostConfig needed to start a container.
-// It can be customized by cfg ContainerConfig.
-func (p *DockerProvider) startConfig(container *dockerclient.Container, cfg *provider.ContainerConfig) (*dockerclient.HostConfig, error) {
-	dcHostConfig := container.HostConfig
-	if cfg == nil {
-		return dcHostConfig, nil
+func (p *DockerProvider) mkHostConfig(hostCfg *dockerclient.HostConfig, cfg *provider.ContainerConfig) (*dockerclient.HostConfig, error) {
+	newCfg := dockerclient.HostConfig{}
+	if hostCfg != nil {
+		newCfg = *hostCfg
 	}
-	// if config field is nil, ignore
-	// if config field is non-nil but len == 0, override with empty
+
+	// Set defaults.
+	newCfg.PublishAllPorts = true
+	if newCfg.Binds == nil {
+		newCfg.Binds = []string{}
+	}
+	if newCfg.PortBindings == nil {
+		newCfg.PortBindings = map[dockerclient.Port][]dockerclient.PortBinding{}
+	}
+
+	if cfg == nil {
+		return &newCfg, nil
+	}
 	if cfg.PortBindings != nil {
 		bs, err := dockerPortBindings(cfg.PortBindings)
 		if err != nil {
 			return nil, err
 		}
-		dcHostConfig.PortBindings = bs
+		newCfg.PortBindings = bs
 	}
 	if cfg.Mounts != nil {
 		ms, err := dockerMountBinds(cfg.Mounts, p.VolumesDir(""))
 		if err != nil {
 			return nil, err
 		}
-		dcHostConfig.Binds = ms
+		newCfg.Binds = ms
 	}
-	if usesNitrousImage(container) {
-		p.nitrousImageConfig(container.Config, dcHostConfig)
-	}
-	return dcHostConfig, nil
-}
-
-func (p *DockerProvider) nitrousImageConfig(dcConfig *dockerclient.Config, dcHostConfig *dockerclient.HostConfig) {
-	dcConfig.ExposedPorts[dockerclient.Port("22/tcp")] = struct{}{}
-	dcConfig.Volumes["/etc/ssh/freighter"] = struct{}{}
-
-	hasSSHBind := false
-	for _, bind := range dcHostConfig.Binds {
-		if strings.HasSuffix(bind, "/etc/ssh/freighter:ro") {
-			hasSSHBind = true
+	if isNitrousImage(cfg.Image) {
+		hasSSHBind := false
+		for _, bind := range newCfg.Binds {
+			if strings.HasSuffix(bind, "/etc/ssh/freighter:ro") {
+				hasSSHBind = true
+				break
+			}
+		}
+		if !hasSSHBind {
+			newCfg.Binds = append(newCfg.Binds, fmt.Sprintf("%s/ssh:/etc/ssh/freighter:ro", p.ContainerSettingsDir(cfg.Hostname)))
 		}
 	}
-	if !hasSSHBind {
-		dcHostConfig.Binds = append(dcHostConfig.Binds, fmt.Sprintf("%s/ssh:/etc/ssh/freighter:ro", p.ContainerSettingsDir(dcConfig.Hostname)))
-	}
+	return &newCfg, nil
 }
 
 func dockerMountBinds(mountSpecs []string, hostVolsPath string) ([]string, error) {

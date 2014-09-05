@@ -130,6 +130,8 @@ func (p *DockerProvider) Create(name, imageName, secret, configJSON string) (*pr
 	if err != nil {
 		return nil, err
 	}
+	cfg.Hostname = name
+	cfg.Image = imageName
 
 	container, err := p.createContainer(imageName, name, cfg)
 	if err != nil {
@@ -194,7 +196,10 @@ func (p *DockerProvider) Start(id, configJSON string) (*provider.ContainerInfo, 
 	if err != nil {
 		return nil, err
 	}
-	startConfig, err := p.startConfig(container, cfg)
+	cfg.Hostname = container.Config.Hostname
+	cfg.Image = container.Image
+
+	startConfig, err := p.mkHostConfig(container.HostConfig, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -792,7 +797,7 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 		return nil, err
 	}
 
-	createConfig, startConfig, err := p.createConfigs(containerName, imageName, config)
+	createConfig, err := p.mkContainerConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -804,18 +809,28 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 	if err != nil {
 		return nil, err
 	}
+	p.logger.TimeInfo(start, "DockerProvider: created container", containerName, container.ID, "in")
 
-	id := container.ID
-	p.logger.TimeInfo(start, "DockerProvider: created container", containerName, id, "in")
+	// Get container info so we get an up-to-date HostConfig since
+	// CreateContainer() *does not* return a full container struct.
+	container, err = p.inspectContainer(container.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	startConfig, err := p.mkHostConfig(container.HostConfig, config)
+	if err != nil {
+		return nil, err
+	}
 
 	p.logger.Info("DockerProvider: starting container", containerName)
 	start = time.Now()
-	if err := p.client.StartContainer(id, startConfig); err != nil {
+	if err := p.client.StartContainer(container.ID, startConfig); err != nil {
 		// Log and don't return an error.
 		p.logger.Errorf("DockerProvider: failed to start container %s: %v", containerName, err)
 		return container, nil
 	}
-	p.logger.TimeInfo(start, "DockerProvider: started container", containerName, id, "in")
+	p.logger.TimeInfo(start, "DockerProvider: started container", containerName, container.ID, "in")
 
 	return container, err
 }
