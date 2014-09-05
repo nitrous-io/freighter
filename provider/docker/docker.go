@@ -267,21 +267,20 @@ func (p *DockerProvider) Stop(id string) (*provider.ContainerInfo, error) {
 }
 
 func (p *DockerProvider) Restart(id string) (*provider.ContainerInfo, error) {
-	_, err := p.inspectContainer(id)
-	if err != nil {
-		return nil, err
-	}
-
 	p.logger.Info("DockerProvider: restarting container", id)
 	start := time.Now()
-
-	err = p.client.RestartContainer(id, 15)
+	// Stop and then start until https://github.com/docker/docker/issues/7693
+	// is fixed.
+	_, err := p.Stop(id)
 	if err != nil {
 		return nil, err
 	}
-
+	info, err := p.Start(id, "")
+	if err != nil {
+		return nil, err
+	}
 	p.logger.TimeInfo(start, "DockerProvider: restarted container", id, "in")
-	return p.GetInfo(id)
+	return info, nil
 }
 
 func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
