@@ -74,9 +74,8 @@ var _ = Describe("provider/docker config", func() {
 				Expect(err).To(BeNil())
 			})
 
-			It("does not have Nitrous-related SSH and volume settings", func() {
+			It("does not expose port 22", func() {
 				Expect(cfg.ExposedPorts).To(HaveLen(0))
-				Expect(cfg.Volumes).To(HaveLen(0))
 			})
 		})
 
