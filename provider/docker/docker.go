@@ -118,6 +118,9 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 	return list, nil
 }
 
+// Create creates and starts a container.
+// If the container cannot be started, the container info *and* a
+// provider.StartFailedError is returned.
 func (p *DockerProvider) Create(name, imageName, secret, configJSON string) (*provider.ContainerInfo, error) {
 	err := p.storeSharedSecret(name, secret)
 	if err != nil {
@@ -142,7 +145,16 @@ func (p *DockerProvider) Create(name, imageName, secret, configJSON string) (*pr
 		return nil, err
 	}
 
-	return p.GetInfo(container.ID)
+	info, err := p.Start(container.ID, configJSON)
+	if err != nil {
+		// Return container info as well if container was created but failed
+		// to start.
+		p.logger.Errorf("DockerProvider: failed to start container %s: %v", name, err)
+		info, _ := p.GetInfo(container.ID)
+		return info, &provider.StartFailedError{Err: err}
+	}
+
+	return info, nil
 }
 
 func (p *DockerProvider) Commit(id, imageName string) (*provider.ImageInfo, error) {
@@ -801,24 +813,7 @@ func (p *DockerProvider) createContainer(imageName, containerName string, config
 	}
 	p.logger.TimeInfo(start, "DockerProvider: created container", containerName, container.ID, "in")
 
-	// Get container info so we get an up-to-date HostConfig since
-	// CreateContainer() *does not* return a full container struct.
-	container, err = p.inspectContainer(container.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	startConfig, err := p.mkHostConfig(container.HostConfig, config)
-	if err != nil {
-		return nil, err
-	}
-
-	p.logger.Info("DockerProvider: starting container", containerName)
-	start = time.Now()
-	err = p.client.StartContainer(container.ID, startConfig)
-	p.logger.TimeInfo(start, "DockerProvider: started container", containerName, container.ID, "in")
-
-	return container, err
+	return container, nil
 }
 
 func (p *DockerProvider) ContainerSettingsDir(containerName string) string {

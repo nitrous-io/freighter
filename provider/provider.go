@@ -2,6 +2,7 @@ package provider
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"time"
@@ -70,6 +71,16 @@ type Provider interface {
 	GetVolumeInfo(slug string) (*VolumeInfo, error)
 
 	AttachToContainer(id string, in io.Reader, out io.Writer) error
+}
+
+// StartFailedError is returned when a container is created successfully but
+// could not be started.
+type StartFailedError struct {
+	Err error
+}
+
+func (e *StartFailedError) Error() string {
+	return fmt.Sprintf("provider: container created but could not be started: %s", e.Err.Error())
 }
 
 type ContainerInfo struct {
