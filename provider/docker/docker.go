@@ -145,6 +145,8 @@ func (p *DockerProvider) Create(name, imageName, secret, configJSON string) (*pr
 }
 
 func (p *DockerProvider) Commit(id, imageName string) (*provider.ImageInfo, error) {
+	p.logger.Infof("DockerProvider: committing container %s to image %s", id, imageName)
+
 	repo, tag := parsers.ParseRepoAndTag(imageName)
 	if tag == "" {
 		tag = "latest"

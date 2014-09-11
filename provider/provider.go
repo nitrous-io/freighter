@@ -12,6 +12,10 @@ const (
 	ContainerStateRunning = "running"
 )
 
+const (
+	ReconfigPrefix = "reconfig-"
+)
+
 var containerNameRe = regexp.MustCompile(`\A[a-z][a-z0-9\-]*[a-z0-9]\z`)
 var (
 	ErrTimeout                 = errors.New("Operation timed out")

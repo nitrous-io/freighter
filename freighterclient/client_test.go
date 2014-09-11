@@ -2,12 +2,14 @@ package freighterclient_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nitrous-io/freighter/freighterclient"
@@ -19,20 +21,22 @@ import (
 )
 
 type ServerTest struct {
-	client    freighterclient.Client
-	host      *freighterclient.Host
-	server    *ghttp.Server
-	handlerFn http.HandlerFunc
+	client     freighterclient.Client
+	host       *freighterclient.Host
+	server     *ghttp.Server
+	handlerFns []http.HandlerFunc
 }
 
-func NewServerTest(handlerFn http.HandlerFunc) (*ServerTest, error) {
-	st := &ServerTest{handlerFn: handlerFn}
+func NewServerTest(handlerFns ...http.HandlerFunc) (*ServerTest, error) {
+	st := &ServerTest{handlerFns: handlerFns}
 	return st.Setup()
 }
 
 func (st *ServerTest) Setup() (*ServerTest, error) {
 	st.server = ghttp.NewServer()
-	st.server.AppendHandlers(st.handlerFn)
+	for _, fn := range st.handlerFns {
+		st.server.AppendHandlers(fn)
+	}
 
 	ip, port, err := ipAndPort(st.server)
 	if err != nil {
@@ -437,6 +441,115 @@ var _ = Describe("client", func() {
 				Expect(ok).To(BeTrue())
 				Expect(server.ReceivedRequests()).To(HaveLen(1))
 				Expect(container).To(BeNil())
+			})
+		})
+	})
+
+	Describe("Reconfig()", func() {
+		var (
+			commitCode, terminateCode, createCode int
+			commitBody, terminateBody, createBody string
+		)
+
+		BeforeEach(func() {
+			commit := ghttp.CombineHandlers(
+				func(w http.ResponseWriter, req *http.Request) {
+					err := req.ParseForm()
+					Expect(err).To(BeNil())
+				},
+				ghttp.VerifyRequest("POST", "/containers/mycon/commit"),
+				ghttp.VerifyContentType("application/x-www-form-urlencoded"),
+				ghttp.RespondWithPtr(&commitCode, &commitBody),
+			)
+			terminate := ghttp.CombineHandlers(
+				ghttp.VerifyRequest("DELETE", "/containers/mycon"),
+				ghttp.VerifyContentType("application/json"),
+				ghttp.RespondWithPtr(&terminateCode, &terminateBody),
+			)
+			create := ghttp.CombineHandlers(
+				func(w http.ResponseWriter, req *http.Request) {
+					err := req.ParseForm()
+					Expect(err).To(BeNil())
+				},
+				ghttp.VerifyRequest("POST", "/containers"),
+				ghttp.VerifyContentType("application/x-www-form-urlencoded"),
+				ghttp.RespondWithPtr(&createCode, &createBody),
+			)
+
+			// set up handlers for success, alter in child contexts as necessary
+			commitCode, terminateCode, createCode = http.StatusOK, http.StatusOK, http.StatusOK
+			commitBody = `{"image":{"id":"61e3a0snip","name":"reconfig-ecbe90snip-timestamp","tag":"latest","created_at":1408125814,"actual_size":109586,"virtual_size":699570512}}`
+			terminateBody = `{"container":{"id":"ecbe90snip","name":"mycon","image":"mycon-8ce6snip-timestamp","host":"","state":"","ports":{}},"result":"terminated"}`
+			createBody = `{"container":{"id":"ff7048snip","name":"mycon","image":"reconfig-ecbe90snip-timestamp","host":"172.17.0.5","state":"running","ports":{"49156":22}}}`
+
+			var err error
+			st, err = NewServerTest(commit, terminate, create)
+			Expect(err).To(BeNil(), "test server failed to start")
+			cl, host, server = st.client, st.host, st.server
+		})
+
+		AfterEach(func() {
+			st.Close()
+		})
+
+		Context("when all calls are successful", func() {
+			It("returns new container info", func() {
+				config := &freighterclient.ContainerConfig{Env: []string{"PAGER=most"}}
+				container, err := cl.Reconfig("mycon", "s3cr3t", config)
+				Expect(err).To(BeNil())
+				Expect(container).To(Equal(&freighterclient.Container{
+					ID:    "ff7048snip",
+					Name:  "mycon",
+					Image: "reconfig-ecbe90snip-timestamp",
+					Host:  "172.17.0.5",
+					State: "running",
+					Ports: map[string]int{"49156": 22},
+				}))
+
+				reqs := server.ReceivedRequests()
+				Expect(reqs).To(HaveLen(3))
+				commitReq, _, createReq := reqs[0], reqs[1], reqs[2]
+				Expect(commitReq.PostFormValue("name")).To(ContainSubstring("reconfig-mycon"))
+				Expect(createReq.PostFormValue("name")).To(Equal("mycon"))
+				Expect(createReq.PostFormValue("image")).To(Equal("reconfig-ecbe90snip-timestamp")) // commitBody image["name"]
+				cfg := freighterclient.ContainerConfig{}
+				err = json.NewDecoder(strings.NewReader(createReq.PostFormValue("config"))).Decode(&cfg)
+				Expect(err).To(BeNil())
+				Expect(cfg.Env).To(Equal([]string{"PAGER=most"}))
+			})
+		})
+
+		Context("when Terminate fails", func() {
+			BeforeEach(func() {
+				terminateCode = http.StatusInternalServerError
+				terminateBody = `{"error": "connor still alive"}`
+			})
+
+			It("returns internal server error", func() {
+				config := &freighterclient.ContainerConfig{Env: []string{"PAGER=most"}}
+				container, err := cl.Reconfig("mycon", "s3cr3t", config)
+				Expect(err).To(MatchError(&freighterclient.StatusError{
+					Code: http.StatusInternalServerError,
+				}))
+				Expect(container).To(BeNil())
+				Expect(server.ReceivedRequests()).To(HaveLen(2), "Create should not be called")
+			})
+		})
+
+		Context("when Commit fails", func() {
+			BeforeEach(func() {
+				commitCode = http.StatusInternalServerError
+				commitBody = `{"error": "commitment issues"}`
+			})
+
+			It("returns internal server error", func() {
+				config := &freighterclient.ContainerConfig{Env: []string{"PAGER=most"}}
+				container, err := cl.Reconfig("mycon", "s3cr3t", config)
+				Expect(err).To(MatchError(&freighterclient.StatusError{
+					Code: http.StatusInternalServerError,
+				}))
+				Expect(container).To(BeNil())
+				Expect(server.ReceivedRequests()).To(HaveLen(1), "Terminate and Create should not be called")
 			})
 		})
 	})
