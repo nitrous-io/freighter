@@ -143,7 +143,7 @@ func TestShellResize(t *testing.T) {
 
 func TestShellAttachProtocol(t *testing.T) {
 	s := testShell()
-	s.cmd = exec.Command("yes", "attach protocol")
+	s.cmd = exec.Command("/bin/bash", "-c", `echo -n "attach protocol" && sleep 10`)
 	defer s.Close()
 	if err := s.Open(100, 80, []string{}); err != nil {
 		t.Fatalf("Unexpected error %v", err)
@@ -155,7 +155,7 @@ func TestShellAttachProtocol(t *testing.T) {
 	ch := s.AttachProtocol(stdinR, out)
 
 	// test resize
-	fmt.Fprint(stdinW, `r|100 200`)
+	fmt.Fprint(stdinW, "\x01r\x02"+b64("100 200")+"\x03")
 	time.Sleep(10 * time.Millisecond)
 	ws, err := term.GetWinsize(s.fd())
 	if err != nil || int(ws.Width) != 100 || int(ws.Height) != 200 {
@@ -164,15 +164,16 @@ func TestShellAttachProtocol(t *testing.T) {
 	}
 
 	// test client close
-	fmt.Fprint(stdinW, `c|good bye`)
+	fmt.Fprint(stdinW, "\x01c\x02"+b64("good bye")+"\x03")
 
 	select {
 	case <-time.After(1000 * time.Millisecond):
 		t.Fatal("timed out")
 	case <-ch:
 		// check output
-		if !strings.Contains(out.String(), "d|attach protocol") {
-			t.Errorf("failed to print correct output, got %s", out.String())
+		expected := "\x01d\x02" + b64("attach protocol") + "\x03"
+		if !strings.Contains(out.String(), expected) {
+			t.Errorf("failed to print %s, got %s", expected, out.String())
 		}
 	}
 }

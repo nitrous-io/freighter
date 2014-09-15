@@ -2,34 +2,64 @@ package shell
 
 import (
 	"bytes"
+	"encoding/base64"
 	"io"
 	"reflect"
 	"testing"
 	"time"
 )
 
+func b64(str string) string {
+	return base64.StdEncoding.EncodeToString([]byte(str))
+}
+
 func TestNewShellReader(t *testing.T) {
+	fragmentedData := "fragmented freaking data"
+	fragmentedDataB64 := b64(fragmentedData)
+
 	testCases := []struct {
-		msg         string
+		msgs        []string
 		expected    string
 		expectedMsg Message
 	}{
-		{`d|whoami`, `whoami`, nil},
-		{`d|ls`, `ls`, nil},
-		{`r|80 20`, ``, &ResizeMsg{width: 80, height: 20}},
-		{`c|good bye`, ``, &CloseMsg{msg: `good bye`}},
+		{[]string{"\x01d\x02" + b64("whoami") + "\x03"}, "whoami", nil},
+		{[]string{"\x01d\x02" + b64("ls") + "\x03"}, "ls", nil},
+		{[]string{"\x01r\x02" + b64("80 20") + "\x03"}, "", &ResizeMsg{width: 80, height: 20}},
+		{[]string{"\x01c\x02" + b64("good bye") + "\x03"}, "", &CloseMsg{msg: "good bye"}},
+		{
+			[]string{
+				"\x01d\x02" + fragmentedDataB64[:8],
+				fragmentedDataB64[8:15],
+				fragmentedDataB64[15:] + "\x03",
+			},
+			fragmentedData,
+			nil,
+		},
 	}
 
 	for _, tc := range testCases {
 		ch := make(chan Message, 1)
-		in := bytes.NewBufferString(tc.msg)
-		s := NewShellReader(in, ch)
+		r, w := io.Pipe()
 
+		shellReader := NewShellReader(r, ch)
 		out := bytes.NewBuffer(nil)
-		n, _ := io.Copy(out, s)
+
+		var n int64
+		done := make(chan struct{})
+		go func() {
+			n, _ = io.Copy(out, shellReader)
+			done <- struct{}{}
+		}()
+
+		for _, msg := range tc.msgs {
+			w.Write([]byte(msg))
+		}
+		r.Close()
+		w.Close()
+		<-done
 
 		if n != int64(len(tc.expected)) {
-			t.Errorf("expect to read %d bytes but only %d bytes", len(tc.msg), n)
+			t.Errorf("expect to read %d bytes but got %d bytes", len(tc.expected), n)
 		}
 
 		if tc.expectedMsg != nil {
@@ -44,7 +74,7 @@ func TestNewShellReader(t *testing.T) {
 		}
 
 		if out.String() != tc.expected {
-			t.Errorf("expect ouput %s but got %s", tc.expected, out.String())
+			t.Errorf("expect output %s but got %s", tc.expected, out.String())
 		}
 	}
 }
@@ -54,7 +84,7 @@ func TestNewShellWriter(t *testing.T) {
 		msg      string
 		expected string
 	}{
-		{`action@foobar`, `d|action@foobar`},
+		{"action@foobar", "\x01d\x02" + b64("action@foobar") + "\x03"},
 	}
 
 	for _, tc := range testCases {

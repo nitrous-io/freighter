@@ -12,18 +12,19 @@ package shell
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 )
 
 var (
-	dataMsg      = []byte("d|")
-	resizeMsg    = []byte("r|")
-	closeMsg     = []byte("c|")
-	heartbeatMsg = []byte("h")
+	headerData      = []byte("d")
+	headerResize    = []byte("r")
+	headerClose     = []byte("c")
+	headerHeartbeat = []byte("h")
 
-	InvalidMessage = errors.New("invalid message")
+	ErrUnexpectedData = errors.New("unexpected data received")
 )
 
 type Message fmt.Stringer
@@ -69,13 +70,10 @@ func (m *CloseMsg) String() string {
 	return fmt.Sprintf("close: %s", m.msg)
 }
 
-// ShellReader handles client input which allows type:
-// - p|
-// - w|
-// - c|
-// - h
 type ShellReader struct {
 	reader io.Reader
+	header []byte
+	buffer *bytes.Buffer
 	// for out of band input such as heartbeat / resize / close
 	msgChan chan Message
 }
@@ -84,37 +82,107 @@ func NewShellReader(r io.Reader, ch chan Message) io.Reader {
 	return &ShellReader{reader: r, msgChan: ch}
 }
 
-func (s *ShellReader) Read(p []byte) (int, error) {
-	l := len(p)
-	buf := make([]byte, l)
-	n, err := s.reader.Read(buf)
-	// if we had non-eof error, fail early
-	if err != nil && err != io.EOF {
-		return 0, fmt.Errorf("ShellReader: failed to read with err %s", err)
-	}
-	if n >= 2 {
-		// detect client input, copy everything back to p without the prefix
-		if bytes.Equal(buf[0:2], dataMsg) {
-			i := copy(p, buf[2:n])
-			return i, err
-		}
-		// detect resize msg
-		if bytes.Equal(buf[0:2], resizeMsg) {
-			msg := NewResizeMsg(buf[2:n])
-			s.msgChan <- msg
-			return 0, nil
-		}
-		// detect close msg
-		if bytes.Equal(buf[0:2], closeMsg) {
-			msg := &CloseMsg{string(buf[2:n])}
-			s.msgChan <- msg
-			return 0, nil
-		}
-	}
-	return 0, err
+func (s *ShellReader) startBuffer(r io.Reader) ([]byte, error) {
+	s.buffer = bytes.NewBuffer(nil)
+	return s.fillBuffer(r)
 }
 
-// ShellWriter handles server write which outputs d|server_output
+func (s *ShellReader) fillBuffer(r io.Reader) ([]byte, error) {
+	if s.buffer == nil {
+		return nil, ErrUnexpectedData
+	}
+	rBuf := bytes.NewBuffer(nil)
+	if _, err := rBuf.ReadFrom(r); err != nil {
+		s.buffer = nil
+		return nil, err
+	}
+
+	// read until ETX
+	data, err := rBuf.ReadBytes('\x03')
+
+	if err == nil { // ETX reached
+		// strip ETX
+		data = data[:len(data)-1]
+		if _, err := s.buffer.Write(data); err != nil {
+			s.buffer = nil
+			return nil, err
+		}
+		return s.finishBuffer(), nil
+	}
+
+	// ETX not reached
+	_, err = s.buffer.Write(data)
+	if err != nil {
+		s.buffer = nil
+	}
+	return nil, err
+}
+
+func (s *ShellReader) finishBuffer() []byte {
+	// dump and decode base64
+	data := s.buffer.String()
+	s.buffer = nil
+	decoded, _ := base64.StdEncoding.DecodeString(data)
+	return decoded
+}
+
+func (s *ShellReader) Read(out []byte) (int, error) {
+	input := make([]byte, len(out))
+	n, err := s.reader.Read(input)
+
+	if err != nil || n == 0 {
+		return 0, err
+	}
+
+	inBuf := bytes.NewBuffer(input[:n])
+	var data []byte
+
+	switch input[0] {
+	case '\x01': // SOH
+		// read from SOH until STX
+		header, err := inBuf.ReadBytes('\x02')
+		if err != nil {
+			return 0, err
+		}
+		// remove SOH and STX to get header
+		s.header = header[1 : len(header)-1]
+
+		// start reading payload
+		data, err = s.startBuffer(inBuf)
+		if err != nil {
+			return 0, err
+		}
+	case '\x03': // ETX
+		data = s.finishBuffer()
+	default:
+		// if buffering, append to existing buffer
+		data, err = s.fillBuffer(inBuf)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if data == nil {
+		return 0, nil
+	}
+
+	if bytes.Equal(s.header, headerData) { // if data
+		i := copy(out, data)
+		return i, nil
+	} else if bytes.Equal(s.header, headerResize) { // if resize
+		msg := NewResizeMsg(data)
+		s.msgChan <- msg
+		return 0, nil
+	} else if bytes.Equal(s.header, headerClose) { // if close
+		msg := &CloseMsg{string(data)}
+		s.msgChan <- msg
+		return 0, nil
+	}
+
+	return 0, nil
+}
+
+// ShellWriter handles server write which outputs
 type ShellWriter struct {
 	writer io.Writer
 }
@@ -123,11 +191,22 @@ func NewShellWriter(w io.Writer) io.Writer {
 	return &ShellWriter{writer: w}
 }
 
-func (s *ShellWriter) Write(p []byte) (int, error) {
-	l := len(p)
-	buf := make([]byte, l+len(dataMsg))
-	copy(buf[0:2], dataMsg)
-	copy(buf[2:], p)
+func (s *ShellWriter) Write(data []byte) (int, error) {
+	dataLen := len(data)
+	base64DataLen := base64.StdEncoding.EncodedLen(dataLen)
+	buf := make([]byte, 1+len(headerData)+1+base64DataLen+1) // <SOH><event name><STX><base64-data><ETX>
+
+	i := 0
+	buf[0] = '\x01' // SOH
+	i += 1
+	copy(buf[i:], headerData)
+	i += len(headerData)
+	buf[i] = '\x02' // STX
+	i += 1
+	base64.StdEncoding.Encode(buf[i:], data)
+	i += base64DataLen
+	buf[i] = '\x03' // ETX
+
 	_, err := s.writer.Write(buf)
-	return l, err
+	return dataLen, err
 }
