@@ -187,6 +187,8 @@ func (s *Server) drawRoutes() {
 	s.secretRoute("/containers/{id}/public_keys", s.addPublicKeys, "POST", "PUT")
 	s.secretRoute("/containers/{id}/public_keys", s.clearPublicKeys, "DELETE")
 	s.secretRoute("/containers/{id}/public_keys/{key_fingerprint}", s.removePublicKey, "DELETE")
+	s.secretRoute("/containers/{id}/reconfig", s.reconfigureContainer, "POST")
+
 	s.route("/containers/{id}/logs", s.wrapError(s.withContainerToken(s.getContainerLogs, "logs")), "GET")
 	s.route("/containers/{id}/attach/ws", s.wrapError(s.withContainerToken(s.wsAttachToContainer, "attach")), "GET")
 

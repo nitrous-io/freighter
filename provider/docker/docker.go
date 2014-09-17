@@ -315,7 +315,7 @@ func (p *DockerProvider) Restart(id string) (*provider.ContainerInfo, error) {
 	return info, nil
 }
 
-func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
+func (p *DockerProvider) Terminate(id string, removeSettings bool) (*provider.ContainerInfo, error) {
 	p.logger.Info("DockerProvider: terminating container", id)
 	terminationStart := time.Now()
 
@@ -332,9 +332,10 @@ func (p *DockerProvider) Terminate(id string) (*provider.ContainerInfo, error) {
 		return nil, err
 	}
 
-	err = os.RemoveAll(p.ContainerSettingsDir(info.Name))
-	if err != nil {
-		return nil, err
+	if removeSettings {
+		if err := os.RemoveAll(p.ContainerSettingsDir(info.Name)); err != nil {
+			return nil, err
+		}
 	}
 
 	p.logger.TimeInfo(start, "DockerProvider: removed container", id, "in")
@@ -416,6 +417,41 @@ func (p *DockerProvider) RemovePublicKey(id string, keyFingerprint string) error
 	keys = keyMapToKeys(keymap)
 
 	return p.createAuthorizedKeys(name, keys)
+}
+
+// Reconfig recreates a container from its original image with new config,
+// since at this time docker container configs are frozen once set.
+func (p *DockerProvider) Reconfig(id, configJSON string) (*provider.ContainerInfo, error) {
+	fromCnr, err := p.Stop(id)
+	if err != nil {
+		return nil, err
+	}
+	name := fromCnr.Name
+	secret, err := p.readSharedSecret(name)
+	if err != nil {
+		return nil, err
+	}
+	if err := p.backup(id, name); err != nil {
+		return nil, err
+	}
+	if _, err := p.Terminate(id, false); err != nil {
+		return nil, err
+	}
+
+	errf := "reconfig failed on %s during %s after termination: %s" // (id, step, error)
+	toCnr, err := p.Create(name, fromCnr.Image, secret, configJSON)
+	if err != nil {
+		return nil, fmt.Errorf(errf, id, "create", err)
+	}
+	if err := p.restore(name, fromCnr.ID, toCnr.ID); err != nil {
+		return toCnr, fmt.Errorf(errf, id, "restore", err)
+	}
+
+	startedCnr, err := p.Start(toCnr.ID, configJSON)
+	if err != nil {
+		return toCnr, fmt.Errorf(errf, id, "start", err)
+	}
+	return startedCnr, nil
 }
 
 // Logs gets stdout and stderr logs from a container. If successful, the logs

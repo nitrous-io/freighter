@@ -84,6 +84,7 @@ type Client interface {
 	Stop(id string) (*Container, error)
 	Restart(id string) (*Container, error)
 	Terminate(id string) (*Container, error)
+	Reconfig(id string, config *ContainerConfig) (*Container, error)
 
 	AddPublicKeys(id string, keys []string) error
 	ClearPublicKeys(id string) error
@@ -629,6 +630,49 @@ func (c *client) RemovePublicKey(id string, fingerprint string) error {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	return c.doPublicKeyOp(req)
+}
+
+func (c *client) Reconfig(id string, config *ContainerConfig) (*Container, error) {
+	data := url.Values{}
+	if config != nil {
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return nil, err
+		}
+		data.Set("config", string(configJSON))
+	}
+
+	u := fmt.Sprintf("%s/containers/%s/reconfig", c.host.BaseURL(), id)
+	req, err := http.NewRequest("POST", u, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := performRequest(c, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		// Success, do nothing.
+	case StatusUnprocessableEntity:
+		errResp, err := unmarshalErrorResponse(resp)
+		if err != nil {
+			return nil, ErrUnexpectedResponse
+		}
+		return nil, &InvalidParamError{errResp.Error}
+	default:
+		return nil, statusError(resp)
+	}
+
+	containerResp, err := unmarshalContainerResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	return containerResp.Container, nil
 }
 
 func (c *client) HostInfo(period time.Duration) (*HostInfo, error) {

@@ -21,7 +21,7 @@ format:
 
 test:
 	@echo "$(OK_COLOR)==> Testing...$(NO_COLOR)"
-	script/test $(TEST)
+	@script/test $(TEST)
 
 ci: image
 	@echo "$(OK_COLOR)==> Running within docker...$(NO_COLOR)"

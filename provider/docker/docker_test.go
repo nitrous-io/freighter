@@ -568,7 +568,7 @@ var _ = Describe("provider/docker", func() {
 						// Get container info before terminating.
 						origInfo := getContainerInfo(id)
 
-						info, err := prov.Terminate(id)
+						info, err := prov.Terminate(id, true)
 						Expect(err).To(BeNil())
 						expectContainerToBeTerminatedAndPortReleased(info)
 						expectContainerInfoToHaveBeenReturned(info, origInfo)
@@ -585,11 +585,96 @@ var _ = Describe("provider/docker", func() {
 						// Get container info before terminating.
 						origInfo := getContainerInfo(id)
 
-						info, err := prov.Terminate(id)
+						info, err := prov.Terminate(id, true)
 						Expect(err).To(BeNil())
 						expectContainerToBeTerminatedAndPortReleased(info)
 						expectContainerInfoToHaveBeenReturned(info, origInfo)
 					})
+				})
+			})
+
+			Describe(".Reconfig()", func() {
+				BeforeEach(func() {
+					terminateAfterTest = false
+				})
+
+				It("changes the container id and settings", func() {
+					configJSON := `{
+						"Env": ["LANG=C","PAGER=more"],
+						"PortBindings": ["private:65000:3000", "public:8888:8888"]
+					}`
+
+					// In tests the container data will be inside the dind
+					// container and not easy to access unless the tests are
+					// running inside dind as well.
+					// The diff path wouldn't exist on the host where tests are
+					// running, so we have to create it.
+					rootPath := filepath.Join(docker.BaseAUFSDir, "diff", id, "root")
+					filePath := filepath.Join(rootPath, ".vimrc")
+					err := os.MkdirAll(rootPath, 0700)
+					Expect(err).To(BeNil())
+					err = ioutil.WriteFile(filePath, []byte("set nocompatible"), 0600)
+					Expect(err).To(BeNil())
+
+					reconfig1, err := prov.Reconfig(id, configJSON)
+					if reconfig1 != nil { // id will change, default cleanup won't catch
+						// if the second reconfig succeeds, cleanUp of the
+						// first container not necessary
+						defer func() {
+							out, _ := exec.Command("docker", "inspect", reconfig1.ID).CombinedOutput()
+							if !strings.Contains(string(out), "No such image or container") {
+								cleanUpContainer(reconfig1.ID)
+							}
+						}()
+					}
+					Expect(err).To(BeNil())
+					Expect(reconfig1.ID).NotTo(Equal(id), "container ID should be changed after recreating")
+					Expect(doInspect(reconfig1.ID, "{{.Config.Env}}")).To(ContainSubstring("LANG=C"))
+					Expect(doInspect(reconfig1.ID,
+						"{{range $p, $stub := .Config.ExposedPorts}}{{$p}} {{end}}")).
+						To(Equal("22/tcp 3000 8888"))
+
+					newRootPath := filepath.Join(docker.BaseAUFSDir, "diff", reconfig1.ID, "root")
+					bs, err := ioutil.ReadFile(filepath.Join(newRootPath, ".vimrc"))
+					Expect(err).To(BeNil(), "old container data not migrated")
+					Expect(string(bs)).To(Equal("set nocompatible"))
+
+					newConfigJSON := `{
+						"Env": ["PAGER=less"],
+						"PortBindings": ["public:4000:4000"]
+					}`
+					reconfig2, err := prov.Reconfig(reconfig1.ID, newConfigJSON)
+					if reconfig2 != nil { // id will change, default cleanup won't catch
+						defer cleanUpContainer(reconfig2.ID)
+					}
+					Expect(err).To(BeNil())
+					// reconfig settings are not additive; the given config is
+					// the one used, except for any default settings that are
+					// added (port 22 for nitrous images, etc)
+					Expect(doInspect(reconfig2.ID, "{{.Config.Env}}")).To(ContainSubstring("PAGER=less"))
+					Expect(doInspect(reconfig2.ID, "{{.Config.Env}}")).NotTo(ContainSubstring("LANG=C"))
+					Expect(doInspect(reconfig2.ID,
+						"{{range $p, $stub := .Config.ExposedPorts}}{{$p}} {{end}}")).
+						To(Equal("22/tcp 4000"))
+				})
+
+				It("returns detailed error on failure to complete", func() {
+					configJSON := `{
+						"PortBindings": ["public::123456789"]
+					}`
+					rootPath := filepath.Join(docker.BaseAUFSDir, "diff", id, "root")
+					err := os.MkdirAll(rootPath, 0700)
+					Expect(err).To(BeNil())
+
+					info, err := prov.Reconfig(id, configJSON)
+					if info != nil { // id will change, default cleanup won't catch
+						defer cleanUpContainer(info.ID)
+					}
+					Expect(err).NotTo(BeNil())
+					Expect(err.Error()).To(ContainSubstring("reconfig failed on " + id))
+					Expect(err.Error()).To(ContainSubstring("during start after termination"))
+					Expect(info).NotTo(BeNil(), "created container not returned")
+					Expect(info.ID).NotTo(Equal(id))
 				})
 			})
 
