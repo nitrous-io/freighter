@@ -1449,13 +1449,32 @@ var _ = Describe("server", func() {
 		})
 	})
 
-	Describe("GET /containers/:id/attach/ws", func() {
+	itHandlesCORSPreflight := func(url string) {
+		It("handles CORS preflight", func() {
+			req, err := NewRequest("OPTIONS", url, nil)
+			Expect(err).To(BeNil())
+			req.Header.Set("Access-Control-Request-Headers", "Foo")
+			req.Header.Add("Access-Control-Request-Headers", "Bar")
+			handler.ServeHTTP(res, req)
+			Expect(res.Code).To(Equal(http.StatusOK))
+			Expect(res.Header()["Access-Control-Allow-Origin"]).To(ContainElement("*"))
+			Expect(res.Header()["Access-Control-Allow-Methods"]).To(ContainElement("*"))
+			Expect(res.Header()["Access-Control-Allow-Headers"]).To(ContainElement("Foo, Bar"))
+			Expect(res.Header()["Access-Control-Allow-Credentials"]).To(ContainElement("true"))
+		})
+	}
+
+	Describe("OPTIONS /containers/:id/attach", func() {
+		itHandlesCORSPreflight("/containers/1/shell")
+	})
+
+	Describe("GET /containers/:id/attach", func() {
 		doRequest := func(containerID, token string) (*websocket.Conn, error) {
 			ts := httptest.NewServer(handler)
 			defer ts.Close()
 			params := &url.Values{}
 			params.Set("token", token)
-			wsURL, err := url.Parse(fmt.Sprintf("ws://%s/containers/%s/attach/ws", ts.Listener.Addr().String(), containerID))
+			wsURL, err := url.Parse(fmt.Sprintf("ws://%s/containers/%s/attach", ts.Listener.Addr().String(), containerID))
 			if err != nil {
 				return nil, err
 			}
@@ -1523,7 +1542,7 @@ var _ = Describe("server", func() {
 				messageType, msg, err := conn.ReadMessage()
 				Expect(err).To(BeNil())
 				Expect(messageType).To(Equal(websocket.TextMessage))
-				Expect(string(msg)).To(Equal("attach output"))
+				Expect(string(msg)).To(Equal("d|attach output"))
 			})
 
 			It("writes the error to WebSocket when there is an error", func() {
@@ -1540,7 +1559,7 @@ var _ = Describe("server", func() {
 				for {
 					messageType, msg, err := conn.ReadMessage()
 					Expect(err).To(BeNil())
-					if messageType != websocket.TextMessage || string(msg) == "" {
+					if messageType != websocket.TextMessage || string(msg[2:]) == "" {
 						continue
 					}
 					Expect(string(msg)).To(Equal("some attach error"))
@@ -1549,21 +1568,6 @@ var _ = Describe("server", func() {
 			})
 		})
 	})
-
-	itHandlesCORSPreflight := func(url string) {
-		It("handles CORS preflight", func() {
-			req, err := NewRequest("OPTIONS", url, nil)
-			Expect(err).To(BeNil())
-			req.Header.Set("Access-Control-Request-Headers", "Foo")
-			req.Header.Add("Access-Control-Request-Headers", "Bar")
-			handler.ServeHTTP(res, req)
-			Expect(res.Code).To(Equal(http.StatusOK))
-			Expect(res.Header()["Access-Control-Allow-Origin"]).To(ContainElement("*"))
-			Expect(res.Header()["Access-Control-Allow-Methods"]).To(ContainElement("*"))
-			Expect(res.Header()["Access-Control-Allow-Headers"]).To(ContainElement("Foo, Bar"))
-			Expect(res.Header()["Access-Control-Allow-Credentials"]).To(ContainElement("true"))
-		})
-	}
 
 	Describe("OPTIONS /containers/:id/shell", func() {
 		itHandlesCORSPreflight("/containers/1/shell")

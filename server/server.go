@@ -188,13 +188,14 @@ func (s *Server) drawRoutes() {
 	s.secretRoute("/containers/{id}/public_keys", s.clearPublicKeys, "DELETE")
 	s.secretRoute("/containers/{id}/public_keys/{key_fingerprint}", s.removePublicKey, "DELETE")
 	s.secretRoute("/containers/{id}/reconfig", s.reconfigureContainer, "POST")
-	s.route("/containers/{id}/attach/ws", s.wrapError(s.withContainerToken(s.wsAttachToContainer, "attach")), "GET")
 
 	// handle websocket custom protocol
 	s.route("/containers/{id}/shell", s.handleCORSPreflight, "OPTIONS")
 	s.route("/containers/{id}/shell", s.wrapError(s.cors(s.withContainerToken(s.wsNewShell, "shell"))), "GET")
 	s.route("/containers/{id}/logs", s.handleCORSPreflight, "OPTIONS")
 	s.route("/containers/{id}/logs", s.wrapError(s.cors(s.withContainerToken(s.wsContainerLogs, "logs"))), "GET")
+	s.route("/containers/{id}/attach", s.handleCORSPreflight, "OPTIONS")
+	s.route("/containers/{id}/attach", s.wrapError(s.cors(s.withContainerToken(s.wsAttachToContainer, "attach"))), "GET")
 
 	s.secretRoute("/registry/auth", s.loginRegistry, "POST")
 	s.secretRoute("/registry/auth", s.logoutRegistry, "DELETE")
