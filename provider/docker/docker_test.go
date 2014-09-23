@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	dockerclient "github.com/fsouza/go-dockerclient"
@@ -39,7 +40,19 @@ const (
 	busyboxImage = "busybox:latest"
 )
 
+// map of container ids for caching inspect output
+var (
+	inspected map[string]string
+	funcMap   = template.FuncMap{
+		"json": func(v interface{}) string {
+			a, _ := json.Marshal(v)
+			return string(a)
+		},
+	}
+)
+
 var _ = BeforeSuite(func() {
+	inspected = make(map[string]string)
 	err := exec.Command("docker", "pull", nitrousImage).Run()
 	Expect(err).To(BeNil(), "failed to pull %s image", nitrousImage)
 	err = exec.Command("docker", "pull", busyboxImage).Run()
@@ -74,10 +87,30 @@ var _ = Describe("provider/docker", func() {
 		exec.Command("docker", "rm", name).Run()
 	}
 
+	uncache := func(id string) {
+		delete(inspected, id)
+	}
+
 	doInspect := func(id, format string) string {
-		out, err := exec.Command("docker", "inspect", "-f", format, id).CombinedOutput()
-		Expect(err).To(BeNil(), "docker inspect -f %v %v failed with output: %v", format, id, string(out))
-		return strings.TrimSpace(string(out))
+		inspectOut, ok := inspected[id]
+		if !ok {
+			out, err := exec.Command("docker", "inspect", id).CombinedOutput()
+			Expect(err).To(BeNil(), "docker inspect %v failed with output: %v", id, string(out))
+			inspectOut = strings.TrimSpace(string(out))
+			inspected[id] = inspectOut
+		}
+
+		tmpl, err := template.New("").Funcs(funcMap).Parse(format)
+		Expect(err).To(BeNil(), fmt.Sprintf("invalid format given to doInspect: %s", format))
+
+		var results []interface{} // docker inspect returns array of inspect results (one per id given)
+		templated := bytes.NewBufferString("")
+		err = json.Unmarshal([]byte(inspectOut), &results)
+		Expect(err).To(BeNil())
+		Expect(results).To(HaveLen(1))
+		err = tmpl.Execute(templated, results[0])
+		Expect(err).To(BeNil())
+		return templated.String()
 	}
 
 	getID := func(name string) string {
@@ -1037,7 +1070,7 @@ var _ = Describe("provider/docker", func() {
 			Expect(doInspect(id, "{{.Config.Env}}")).To(ContainSubstring("LANG=C"))
 			Expect(doInspect(id,
 				"{{range $p, $stub := .Config.ExposedPorts}}{{$p}} {{end}}")).
-				To(Equal("22/tcp 3000 8888"))
+				To(Equal("22/tcp 3000 8888 "))
 
 			port3000Binding := getPortBindings(id, "3000")
 			Expect(port3000Binding).To(ContainSubstring("HostIp:172.17.42.1"))
@@ -1080,6 +1113,9 @@ var _ = Describe("provider/docker", func() {
 			// It("overrides existing PortBindings,Binds on next start if options given")
 			_, err = prov.Stop(id)
 			Expect(err).To(BeNil())
+
+			uncache(id)
+
 			newConfig := strings.Replace(configJSON, "3000", "4242/tcp", 1)
 			newConfig = strings.Replace(newConfig, "backups", "restores", 1)
 			_, err = prov.Start(id, newConfig)
@@ -1530,6 +1566,7 @@ var _ = Describe("provider/docker", func() {
 				err := prov.TagImage(target[0], "overridelyreplacey:n1", true)
 				Expect(err).To(BeNil())
 
+				uncache("overridelyreplacey:n1")
 				newId := getID("overridelyreplacey:n1")
 				Expect(newId).ToNot(Equal(curId))
 				removeImages(target)
