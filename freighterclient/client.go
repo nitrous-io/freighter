@@ -94,10 +94,6 @@ type Client interface {
 	RemoveVolume(slug string) error
 	GetVolumeInfo(slug string) (*Volume, error)
 
-	// Logs get logs of the container's process and copy it to the writer.
-	// http://docs.docker.com/reference/api/docker_remote_api_v1.13/#get-container-logs
-	Logs(id, token, follow, timestamps, tail string, w io.Writer) error
-
 	RegistryLogin(params *RegistryAuth) error
 	RegistryLogout(registry string) error
 
@@ -442,58 +438,6 @@ func (c *client) Terminate(id string) (*Container, error) {
 	defer resp.Body.Close()
 
 	return processContainerResponse(resp)
-}
-
-// Establish a streaming HTTP connection with Freighter host to pull the
-// specified container's logs. The response will be write into a provided
-// `io.Writer`
-func (c *client) Logs(
-	id string,
-	token string,
-	follow string,
-	timestamps string,
-	tail string,
-	w io.Writer,
-) error {
-	params := url.Values{}
-	params.Set("follow", follow)
-	params.Set("timestamps", timestamps)
-	params.Set("tail", tail)
-	u := fmt.Sprintf("%s/containers/%s/logs?%s", c.host.BaseURL(), id, params.Encode())
-	req, err := http.NewRequest("GET", u, nil)
-	if err != nil {
-		return err
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Token "+token)
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		errorResp, err := unmarshalErrorResponse(resp)
-		if err != nil {
-			return err
-		}
-		switch errorResp.Error {
-		case ErrTokenVerificationFailed.Error():
-			return ErrTokenVerificationFailed
-		case ErrTokenExpired.Error():
-			return ErrTokenExpired
-		case ErrUnverifiable.Error():
-			return ErrUnverifiable
-		default:
-			return statusError(resp)
-		}
-	}
-	if _, err := io.Copy(w, resp.Body); err != nil {
-		return fmt.Errorf("Unexpected error when fetching logs: %v", err)
-	}
-	return nil
 }
 
 func (c *client) RegistryLogin(p *RegistryAuth) error {

@@ -252,10 +252,6 @@ func (c *MockClient) GetVolumeInfo(slug string) (*Volume, error) {
 	return c.VolumeInfoReturn, c.VolumeInfoError
 }
 
-func (c *MockClient) Logs(id, token string, follow, timestamps, tail string, w io.Writer) error {
-	return nil
-}
-
 func (c *MockClient) RegistryLogin(p *RegistryAuth) error {
 	c.RegistryLoginCalled++
 	c.ReceivedUsername = p.Username

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -1354,28 +1353,6 @@ var _ = Describe("client", func() {
 				Expect(vi.Slug).To(Equal("music"))
 				Expect(vi.Size).To(Equal(uint64(12345)))
 			})
-		})
-	})
-
-	Describe("Logs()", func() {
-		It("gets logs of the container", func() {
-			params := url.Values{}
-			params.Set("follow", "true")
-			params.Set("timestamps", "true")
-			params.Set("tail", "all")
-			handlers := ghttp.CombineHandlers(
-				ghttp.VerifyHeaderKV("Authorization", "Token container-token"),
-				ghttp.VerifyRequest("GET", "/containers/deadbeef/logs", params.Encode()),
-				ghttp.RespondWith(http.StatusOK, "hello i am a log"),
-			)
-
-			st, _ := NewServerTest(handlers)
-			defer st.Close()
-
-			w := bytes.NewBuffer(nil)
-			err := st.client.Logs("deadbeef", "container-token", "true", "true", "all", w)
-			Expect(err).To(BeNil(), "should successfully get the logs")
-			Expect(w.String()).To(Equal("hello i am a log"), "should write logs to the writer")
 		})
 	})
 
