@@ -84,6 +84,7 @@ type MockProvider struct {
 	ReceivedFollow     bool
 	ReceivedTimestamps bool
 	ReceivedTail       string
+	WriteToLogsStream  string
 
 	LoginCalled      bool
 	LoginError       error
@@ -264,6 +265,7 @@ func (p *MockProvider) Logs(id string, w io.Writer, follow, timestamps bool, tai
 	p.ReceivedFollow = follow
 	p.ReceivedTimestamps = timestamps
 	p.ReceivedTail = tail
+	w.Write([]byte(p.WriteToLogsStream))
 	return p.LogsError
 }
 
