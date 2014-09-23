@@ -182,7 +182,7 @@ var _ = Describe("provider/docker", func() {
 	Describe(".Create()", func() {
 		It("creates a running container", func() {
 			name := RandomName("freightertest")
-			info, err := prov.Create(name, nitrousImage, secret, "")
+			info, err := prov.CreateStart(name, nitrousImage, secret, "")
 			Expect(err).To(BeNil())
 			defer cleanUpContainer(name)
 			id := getID(name)
@@ -226,7 +226,7 @@ var _ = Describe("provider/docker", func() {
 
 		It("returns an ErrImageNotFound when creating from an image that does not exist", func() {
 			name := RandomName("freightertest")
-			_, err := prov.Create(name, "non-existent-image", secret, "")
+			_, err := prov.CreateStart(name, "non-existent-image", secret, "")
 			Expect(err).To(MatchError(provider.ErrImageNotFound))
 		})
 
@@ -235,7 +235,7 @@ var _ = Describe("provider/docker", func() {
 				// Create container with config that prevents it from
 				// started.
 				name := RandomName("freightertest")
-				info, err := prov.Create(name, nitrousImage, secret,
+				info, err := prov.CreateStart(name, nitrousImage, secret,
 					`{"PortBindings": ["127.0.0.1:99999:99999"]}`) // Port out of range.
 				defer cleanUpContainer(name)
 
@@ -267,7 +267,7 @@ var _ = Describe("provider/docker", func() {
 			BeforeEach(func() {
 				var err error
 				name = RandomName("freightertest")
-				info, err = prov.Create(name, nitrousImage, secret, "")
+				info, err = prov.CreateStart(name, nitrousImage, secret, "")
 				Expect(err).To(BeNil())
 				id = getID(name)
 			})
@@ -282,7 +282,7 @@ var _ = Describe("provider/docker", func() {
 				It("returns a list of all containers", func() {
 					// Create another container.
 					container2Name := RandomName("freightertest2")
-					container2Info, err := prov.Create(container2Name, nitrousImage, secret, "")
+					container2Info, err := prov.CreateStart(container2Name, nitrousImage, secret, "")
 					Expect(err).To(BeNil())
 					defer cleanUpContainer(container2Name)
 
@@ -1082,7 +1082,7 @@ var _ = Describe("provider/docker", func() {
 			  "Mounts": ["dotfiles:/etc/dotfiles","backups"],
 				"PortBindings": ["private:65000:3000", "public:8888:8888"]
 			}`
-			info, err := prov.Create(name, nitrousImage, secret, configJSON)
+			info, err := prov.CreateStart(name, nitrousImage, secret, configJSON)
 			Expect(err).To(BeNil())
 			defer cleanUpContainer(name)
 

@@ -100,7 +100,7 @@ func (s *Server) createContainer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	info, err := s.provider.Create(name, image, secret, r.FormValue("config"))
+	info, err := s.provider.CreateStart(name, image, secret, r.FormValue("config"))
 	if err != nil {
 		if _, ok := err.(*provider.StartFailedError); ok {
 			s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{

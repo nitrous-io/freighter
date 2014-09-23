@@ -37,7 +37,7 @@ type Provider interface {
 	VerifyToken(id, token string, permissions ...string) error
 
 	List() (infoList []*ContainerInfo, err error)
-	Create(name, image, secret, config string) (info *ContainerInfo, err error)
+	CreateStart(name, image, secret, config string) (info *ContainerInfo, err error)
 	Commit(id, imageName string) (info *ImageInfo, err error)
 	GetInfo(id string) (info *ContainerInfo, err error)
 	Start(id, config string) (info *ContainerInfo, err error)

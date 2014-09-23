@@ -123,7 +123,25 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 // Create creates and starts a container.
 // If the container cannot be started, the container info *and* a
 // provider.StartFailedError is returned.
-func (p *DockerProvider) Create(name, imageName, secret, configJSON string) (*provider.ContainerInfo, error) {
+func (p *DockerProvider) CreateStart(name, imageName, secret, configJSON string) (*provider.ContainerInfo, error) {
+	createdCnr, err := p.create(name, imageName, secret, configJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	startedCnr, err := p.Start(createdCnr.ID, configJSON)
+	if err != nil {
+		// Return container info as well if container was created but failed
+		// to start.
+		p.logger.Errorf("DockerProvider: failed to start container %s: %v", name, err)
+		info, _ := p.GetInfo(createdCnr.ID)
+		return info, &provider.StartFailedError{Err: err}
+	}
+
+	return startedCnr, nil
+}
+
+func (p *DockerProvider) create(name, imageName, secret, configJSON string) (*provider.ContainerInfo, error) {
 	err := p.storeSharedSecret(name, secret)
 	if err != nil {
 		return nil, err
@@ -157,17 +175,7 @@ func (p *DockerProvider) Create(name, imageName, secret, configJSON string) (*pr
 		}
 		return nil, err
 	}
-
-	info, err := p.Start(container.ID, configJSON)
-	if err != nil {
-		// Return container info as well if container was created but failed
-		// to start.
-		p.logger.Errorf("DockerProvider: failed to start container %s: %v", name, err)
-		info, _ := p.GetInfo(container.ID)
-		return info, &provider.StartFailedError{Err: err}
-	}
-
-	return info, nil
+	return p.GetInfo(container.ID)
 }
 
 func (p *DockerProvider) Commit(id, imageName string) (*provider.ImageInfo, error) {
@@ -439,10 +447,11 @@ func (p *DockerProvider) Reconfig(id, configJSON string) (*provider.ContainerInf
 	}
 
 	errf := "reconfig failed on %s during %s after termination: %s" // (id, step, error)
-	toCnr, err := p.Create(name, fromCnr.Image, secret, configJSON)
+	toCnr, err := p.create(name, fromCnr.Image, secret, configJSON)
 	if err != nil {
 		return nil, fmt.Errorf(errf, id, "create", err)
 	}
+
 	if err := p.restore(name, fromCnr.ID, toCnr.ID); err != nil {
 		return toCnr, fmt.Errorf(errf, id, "restore", err)
 	}
