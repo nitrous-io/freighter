@@ -492,6 +492,7 @@ func (p *DockerProvider) Logs(id string, w io.Writer, follow, timestamps bool, t
 		Tail:         tail,
 		OutputStream: w,
 		ErrorStream:  w,
+		RawTerminal:  true,
 	})
 }
 
@@ -746,6 +747,7 @@ func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Write
 		Stdin:        true,
 		Stdout:       true,
 		Stderr:       true,
+		RawTerminal:  true,
 	})
 }
 
