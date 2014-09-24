@@ -22,6 +22,8 @@ func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig) (*dock
 		Volumes:      map[string]struct{}{},
 		ExposedPorts: map[dockerclient.Port]struct{}{},
 		Env:          []string{},
+		OpenStdin:    true,
+		Tty:          true,
 	}
 
 	dcConfig.Env = cfg.Env
