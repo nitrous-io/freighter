@@ -749,6 +749,15 @@ func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Write
 	})
 }
 
+func (p *DockerProvider) ResizeContainerTTY(id string, height, width int) error {
+	container, err := p.inspectContainer(id)
+	if err != nil {
+		return err
+	}
+
+	return p.client.ResizeContainerTTY(container.ID, height, width)
+}
+
 type authconfig struct {
 	Auth  string `json:"auth"`
 	Email string `json:"email"`

@@ -130,6 +130,11 @@ type MockProvider struct {
 	AttachToContainerError  error
 	WriteToStdout           string
 
+	ResizeContainerTTYCalled bool
+	ResizeContainerTTYError  error
+	ResizeContainerTTYHeight int
+	ResizeContainerTTYWidth  int
+
 	Containers []*provider.ContainerInfo
 	PublicKeys map[string]string
 }
@@ -366,6 +371,14 @@ func (p *MockProvider) AttachToContainer(id string, stdin io.Reader, stdout io.W
 	p.ReceivedID = id
 	stdout.Write([]byte(p.WriteToStdout))
 	return p.AttachToContainerError
+}
+
+func (p *MockProvider) ResizeContainerTTY(id string, height, width int) error {
+	p.ResizeContainerTTYCalled = true
+	p.ReceivedID = id
+	p.ResizeContainerTTYHeight = height
+	p.ResizeContainerTTYWidth = width
+	return p.ResizeContainerTTYError
 }
 
 func (p *MockProvider) IsNotFoundError(err error) bool {
