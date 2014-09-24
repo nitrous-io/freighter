@@ -14,7 +14,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/nitrous-io/freighter/pkg/flusher"
-	"github.com/nitrous-io/freighter/pkg/prefixedwriter"
 	"github.com/nitrous-io/freighter/pkg/shell"
 	"github.com/nitrous-io/freighter/pkg/stats"
 	"github.com/nitrous-io/freighter/provider"
@@ -332,7 +331,7 @@ func (s *Server) wsContainerLogs(w http.ResponseWriter, r *http.Request) error {
 	stream := wsconn.NewConnectionHeartbeat(conn, true)
 	defer stream.Close()
 
-	return s.provider.Logs(id, prefixedwriter.New(stream, "d|"), follow, timestamps, tail)
+	return s.provider.Logs(id, shell.NewShellWriter(stream), follow, timestamps, tail)
 }
 
 // wsNewShell creates a new shell to a container using protocol specified in
@@ -582,13 +581,35 @@ func (s *Server) wsAttachToContainer(w http.ResponseWriter, r *http.Request) err
 	stream := wsconn.NewConnectionHeartbeat(conn, true)
 	defer stream.Close()
 
-	if err := s.provider.AttachToContainer(id, stream, prefixedwriter.New(stream, "d|")); err != nil {
-		// Connection is already hijacked, so write to the WebSocket instead of
-		// returning the error.
-		stream.Write([]byte(err.Error()))
-	}
+	// create stdin/stdout stream with the shell protocol
+	msgCh := make(chan shell.Message, messageQueueSize)
+	stdin := shell.NewShellReader(conn, msgCh, stream.MessageType)
+	stdout := shell.NewShellWriter(stream)
+	exit := make(chan struct{})
 
-	return nil
+	go func() {
+		defer close(exit)
+		if err := s.provider.AttachToContainer(id, stdin, stdout); err != nil {
+			// Connection is already hijacked,
+			// log the error and close the connection
+			s.logger.Errorf("attach: %s", err)
+			stream.Write([]byte("c|an error occurred"))
+		}
+	}()
+
+	for {
+		select {
+		case <-exit:
+			return nil
+		case msg := <-msgCh:
+			switch msg := msg.(type) {
+			case *shell.ResizeMsg:
+				err = s.provider.ResizeContainerTTY(id, msg.Height, msg.Width)
+			default:
+				s.logger.Info("attach: got unknown msg %v", msg)
+			}
+		}
+	}
 }
 
 func randomString() string {

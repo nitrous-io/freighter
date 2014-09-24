@@ -1545,7 +1545,7 @@ var _ = Describe("server", func() {
 				Expect(string(msg)).To(Equal("d|attach output"))
 			})
 
-			It("writes the error to WebSocket when there is an error", func() {
+			It("sends a close message with the error to WebSocket when there is an error", func() {
 				prov.Containers = []*provider.ContainerInfo{{ID: "container-id", State: provider.ContainerStateRunning}}
 				prov.AttachToContainerError = errors.New("some attach error")
 
@@ -1562,7 +1562,7 @@ var _ = Describe("server", func() {
 					if messageType != websocket.TextMessage || string(msg[2:]) == "" {
 						continue
 					}
-					Expect(string(msg)).To(Equal("some attach error"))
+					Expect(string(msg)).To(Equal("c|an error occurred"))
 					break
 				}
 			})
