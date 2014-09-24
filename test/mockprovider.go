@@ -126,9 +126,10 @@ type MockProvider struct {
 	InspectImageReturn *provider.ImageInfo
 	InspectImageError  error
 
-	AttachToContainerCalled bool
-	AttachToContainerError  error
-	WriteToStdout           string
+	AttachToContainerCalled  bool
+	AttachToContainerError   error
+	AttachToContainerNostdin bool
+	WriteToStdout            string
 
 	ResizeContainerTTYCalled bool
 	ResizeContainerTTYError  error
@@ -366,9 +367,10 @@ func (p *MockProvider) GetVolumeInfo(slug string) (*provider.VolumeInfo, error) 
 	return p.VolumeInfoReturn, p.VolumeInfoError
 }
 
-func (p *MockProvider) AttachToContainer(id string, stdin io.Reader, stdout io.Writer) error {
+func (p *MockProvider) AttachToContainer(id string, stdin io.Reader, stdout io.Writer, noStdin bool) error {
 	p.AttachToContainerCalled = true
 	p.ReceivedID = id
+	p.AttachToContainerNostdin = noStdin
 	stdout.Write([]byte(p.WriteToStdout))
 	return p.AttachToContainerError
 }

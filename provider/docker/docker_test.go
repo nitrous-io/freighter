@@ -765,7 +765,7 @@ var _ = Describe("provider/docker", func() {
 					r := strings.NewReader("send value")
 					errCh := make(chan error)
 					go func() {
-						errCh <- prov.AttachToContainer(id, r, &stdout)
+						errCh <- prov.AttachToContainer(id, r, &stdout, false)
 					}()
 
 					// FIXME Ideally we don't have to stop a container but a bug

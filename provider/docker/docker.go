@@ -732,7 +732,7 @@ func (p *DockerProvider) InspectImage(name string) (*provider.ImageInfo, error) 
 	return lookupResult.image, nil
 }
 
-func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Writer) error {
+func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Writer, noStdin bool) error {
 	container, err := p.inspectContainer(id)
 	if err != nil {
 		return err
@@ -744,7 +744,7 @@ func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Write
 		OutputStream: out,
 		ErrorStream:  out,
 		Stream:       true,
-		Stdin:        true,
+		Stdin:        !noStdin,
 		Stdout:       true,
 		Stderr:       true,
 		RawTerminal:  true,

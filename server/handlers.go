@@ -574,11 +574,19 @@ func (s *Server) wsAttachToContainer(w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("Cannot attach to stopped container %v", info.ID)
 	}
 
+	// check if the client request to use BinaryMessage instead of TextMessage
+	binary, _ := strconv.ParseBool(r.FormValue("binary"))
+	// if no-stdin in param is set, STDIN should not be attached
+	noStdin, _ := strconv.ParseBool(r.FormValue("nostdin"))
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade websocket: %v", err)
 	}
 	stream := wsconn.NewConnectionHeartbeat(conn, true)
+	if binary {
+		stream.MessageType = websocket.BinaryMessage
+	}
 	defer stream.Close()
 
 	// create stdin/stdout stream with the shell protocol
@@ -589,7 +597,7 @@ func (s *Server) wsAttachToContainer(w http.ResponseWriter, r *http.Request) err
 
 	go func() {
 		defer close(exit)
-		if err := s.provider.AttachToContainer(id, stdin, stdout); err != nil {
+		if err := s.provider.AttachToContainer(id, stdin, stdout, noStdin); err != nil {
 			// Connection is already hijacked,
 			// log the error and close the connection
 			s.logger.Errorf("attach: %s", err)
