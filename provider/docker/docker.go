@@ -439,6 +439,13 @@ func (p *DockerProvider) Reconfig(id, configJSON string) (*provider.ContainerInf
 	if err != nil {
 		return nil, err
 	}
+
+	imageName := fmt.Sprintf("%s-backup-%d", name, time.Now().UnixNano())
+	img, err := p.Commit(id, imageName)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := p.backup(id, name); err != nil {
 		return nil, err
 	}
@@ -460,6 +467,13 @@ func (p *DockerProvider) Reconfig(id, configJSON string) (*provider.ContainerInf
 	if err != nil {
 		return toCnr, fmt.Errorf(errf, id, "start", err)
 	}
+
+	if err := p.RemoveImage(img.ID); err != nil {
+		// from the user perspective the new container is
+		// started, so log and carry on
+		p.logger.Errorf("reconfig: failed to remove backup image %s, err: %v", imageName, err)
+	}
+
 	return startedCnr, nil
 }
 
