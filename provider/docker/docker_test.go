@@ -144,7 +144,10 @@ var _ = Describe("provider/docker", func() {
 		return string(out)
 	}
 
-	createImages := func(count int, name string, noEntropy bool) []string {
+	// createImages writes a dockerfile from contents and
+	// builds a docker image from it, returning the name of the image.
+	// If contents is zero value, it uses a default dockerfile.
+	createImages := func(count int, name string, noEntropy bool, contents string) []string {
 		pullImage(nitrousImage)
 		dockerLoc, err := ioutil.TempDir("", "DockerTest")
 		Expect(err).To(BeNil())
@@ -155,14 +158,16 @@ var _ = Describe("provider/docker", func() {
 		if noEntropy {
 			entropy = "thing"
 		}
-		dockerFile.WriteString(fmt.Sprintf(`
-			FROM %s
-			MAINTAINER Nitrous.IO, hello@nitrous.io
 
-			RUN echo '%s' >> /tmp/info
-
-			CMD /bin/bash
-		`, nitrousImage, entropy))
+		if contents == "" {
+			contents = fmt.Sprintf(`
+				FROM %s
+				MAINTAINER Nitrous.IO, hello@nitrous.io
+				RUN echo '%s' >> /tmp/info
+				CMD /bin/bash
+			`, nitrousImage, entropy)
+		}
+		dockerFile.WriteString(contents)
 		dockerFile.Close()
 
 		list := []string{}
@@ -1200,7 +1205,7 @@ var _ = Describe("provider/docker", func() {
 			)
 
 			BeforeEach(func() {
-				publicImages = createImages(1, "basic", false)
+				publicImages = createImages(1, "basic", false, "")
 			})
 
 			AfterEach(func() {
@@ -1232,7 +1237,7 @@ var _ = Describe("provider/docker", func() {
 			)
 
 			BeforeEach(func() {
-				createdImages = createImages(2, "multiple", true)
+				createdImages = createImages(2, "multiple", true, "")
 			})
 
 			AfterEach(func() {
@@ -1320,7 +1325,7 @@ var _ = Describe("provider/docker", func() {
 	Describe(".RemoveImage()", func() {
 		Context("when an ID is provided", func() {
 			It("should be deleted", func() {
-				images := createImages(1, "removeable", false)
+				images := createImages(1, "removable", false, "")
 
 				id := doInspect(images[0], "{{.Id}}")
 				Expect(id).ToNot(BeEmpty())
@@ -1333,7 +1338,7 @@ var _ = Describe("provider/docker", func() {
 
 			Context("with running containers using that ID", func() {
 				It("should not delete but preserve the tag of the image", func() {
-					i1 := createImages(1, "multremoveable", true)
+					i1 := createImages(1, "multremovable", true, "")
 					defer removeImages(i1)
 
 					id1 := doInspect(i1[0], "{{.Id}}")
@@ -1354,9 +1359,9 @@ var _ = Describe("provider/docker", func() {
 
 			Context("with multiple images under ID", func() {
 				It("should not allow for deletion", func() {
-					i1 := createImages(1, "multremoveable", true)
+					i1 := createImages(1, "multremovable", true, "")
 					defer removeImages(i1)
-					i2 := createImages(1, "multremoveable2", true)
+					i2 := createImages(1, "multremovable2", true, "")
 					defer removeImages(i2)
 
 					id1 := doInspect(i1[0], "{{.Id}}")
@@ -1375,7 +1380,7 @@ var _ = Describe("provider/docker", func() {
 
 		Context("when a Name is provided", func() {
 			It("should be deleted", func() {
-				images := createImages(1, "removeable", false)
+				images := createImages(1, "removable", false, "")
 
 				err := prov.RemoveImage(images[0])
 				Expect(err).To(BeNil())
@@ -1604,7 +1609,7 @@ var _ = Describe("provider/docker", func() {
 		}
 
 		It("should allow for tagging images without tags", func() {
-			created := createImages(1, "withoutly", false)
+			created := createImages(1, "withoutly", false, "")
 			err := prov.TagImage(created[0], "withoutly2", false)
 			Expect(err).To(BeNil())
 
@@ -1613,7 +1618,7 @@ var _ = Describe("provider/docker", func() {
 		})
 
 		It("should allow for tagging images with tags", func() {
-			created := createImages(1, "tagly", false)
+			created := createImages(1, "tagly", false, "")
 			err := prov.TagImage(created[0], "tagly2:1907", false)
 			Expect(err).To(BeNil())
 
@@ -1624,15 +1629,15 @@ var _ = Describe("provider/docker", func() {
 		Context("image tag already exists", func() {
 
 			It("should not override existing tags with no force", func() {
-				created := createImages(1, "nooverridely", false)
+				created := createImages(1, "nooverridely", false, "")
 				err := prov.TagImage(created[0], "nooverridely:n1", false)
 				Expect(err).To(Equal(provider.ErrImageExists))
 				removeImages(created)
 			})
 
 			It("should override existing tags with force", func() {
-				target := createImages(1, "overridely", false)
-				destination := createImages(1, "overridelyreplacey", false)
+				target := createImages(1, "overridely", false, "")
+				destination := createImages(1, "overridelyreplacey", false, "")
 				curId := doInspect(destination[0], "{{.Id}}")
 
 				err := prov.TagImage(target[0], "overridelyreplacey:n1", true)
@@ -1664,7 +1669,7 @@ var _ = Describe("provider/docker", func() {
 			BeforeEach(func() {
 				var err error
 
-				images := createImages(1, "namely", false)
+				images := createImages(1, "namely", false, "")
 				srcImage = images[0]
 
 				mockProxy = &MockDockerProxy{}
