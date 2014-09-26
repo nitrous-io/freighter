@@ -239,6 +239,24 @@ var _ = Describe("provider/docker", func() {
 			Expect(string(s)).To(Equal(secret))
 		})
 
+		It("returns error without creating if image has no CMD or ENTRYPOINT", func() {
+			imgs := createImages(1, "nocmd", false, fmt.Sprintf(
+				`
+				FROM %s
+				MAINTAINER Nitrous.IO, hello@nitrous.io
+				`, "scratch"))
+			defer removeImages(imgs)
+			img := imgs[0]
+
+			name := RandomName("freightertest")
+			_, err := prov.Create(name, img, secret, "")
+			if err == nil {
+				defer cleanUpContainer(name)
+			}
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("has no CMD or ENTRYPOINT"))
+		})
+
 		It("returns an ErrImageNotFound when creating from an image that does not exist", func() {
 			name := RandomName("freightertest")
 			_, err := prov.CreateStart(name, "non-existent-image", secret, "")
