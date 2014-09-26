@@ -106,6 +106,7 @@ type ContainerInfo struct {
 type ContainerConfig struct {
 	Hostname     string   `json:"-"`
 	Image        string   `json:"-"`
+	Cmd          []string `json:"Cmd"`
 	Env          []string `json:"Env"`
 	Mounts       []string `json:"Mounts"`
 	PortBindings []string `json:"PortBindings"`

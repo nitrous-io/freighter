@@ -30,6 +30,8 @@ var (
 	// list of images 'blessed' by Nitrous. If tag is included, the specific
 	// tag is checked for, otherwise any tag is allowed
 	nitrousImages = []string{"ubuntu-bare:trusty", "ubuntu:trusty", "ruby", "python", "nodejs", "golang", "php"}
+
+	errNoCommand = errors.New("no command specified")
 )
 
 const defaultDockerGateway = "172.17.42.1"
@@ -174,7 +176,9 @@ func (p *DockerProvider) create(name, imageName, secret, configJSON string) (*pr
 	}
 
 	if err := p.runnableImage(img); err != nil {
-		return nil, err
+		if err != errNoCommand || len(cfg.Cmd) == 0 {
+			return nil, err
+		}
 	}
 
 	container, err := p.client.CreateContainer(dockerclient.CreateContainerOptions{
@@ -1056,15 +1060,15 @@ func (p *DockerProvider) runnableImage(img *dockerclient.Image) error {
 	// [/bin/sh , -c , #(nop) some string from the Dockerfile] ; len 3
 	noop := len(cmd) == 3 && cmd[0] == "/bin/sh" && cmd[1] == "-c" && strings.HasPrefix(cmd[2], "#(nop)")
 	if len(img.ContainerConfig.Entrypoint) == 0 && (noop || len(cmd) == 0) {
-		// check parent for CMD
-		if img.Parent != "" {
-			parentImg, err := p.client.InspectImage(img.Parent)
-			if err != nil {
-				return err
-			}
-			return p.runnableImage(parentImg)
+		if img.Parent == "" {
+			return errNoCommand
 		}
-		return fmt.Errorf("image %s has no CMD or ENTRYPOINT", img.ID)
+		// check parent for CMD
+		parentImg, err := p.client.InspectImage(img.Parent)
+		if err != nil {
+			return err
+		}
+		return p.runnableImage(parentImg)
 	}
 	return nil
 }

@@ -239,22 +239,43 @@ var _ = Describe("provider/docker", func() {
 			Expect(string(s)).To(Equal(secret))
 		})
 
-		It("returns error without creating if image has no CMD or ENTRYPOINT", func() {
-			imgs := createImages(1, "nocmd", false, fmt.Sprintf(
-				`
-				FROM %s
+		Context("when image has no CMD or ENTRYPOINT", func() {
+			var dockerfile = `
+				FROM scratch
 				MAINTAINER Nitrous.IO, hello@nitrous.io
-				`, "scratch"))
-			defer removeImages(imgs)
-			img := imgs[0]
+			`
+			It("returns error without creating if no CMD is given", func() {
+				imgs := createImages(1, "nocmd", false, dockerfile)
+				defer removeImages(imgs)
+				img := imgs[0]
 
-			name := RandomName("freightertest")
-			_, err := prov.Create(name, img, secret, "")
-			if err == nil {
+				name := RandomName("freightertest")
+				_, err := prov.Create(name, img, secret, "")
+				if err == nil {
+					defer cleanUpContainer(name)
+				}
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("no command specified"))
+			})
+
+			It("creates and starts if CMD is given to container config", func() {
+				imgs := createImages(1, "nocmd", false, `
+					FROM busybox
+					CMD []
+				`)
+				defer removeImages(imgs)
+				imgName := imgs[0]
+				img, err := prov.Client().InspectImage(imgName)
+				Expect(err).To(BeNil())
+				Expect(prov.RunnableImage(img)).To(MatchError("no command specified"))
+
+				name := RandomName("freightertest")
+				configJSON := `{ "Cmd": ["yes"] }`
+				cnr, err := prov.Create(name, imgName, secret, configJSON)
+				Expect(err).To(BeNil())
 				defer cleanUpContainer(name)
-			}
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("has no CMD or ENTRYPOINT"))
+				Expect(cnr.Cmd).To(Equal([]string{"yes"}))
+			})
 		})
 
 		It("returns an ErrImageNotFound when creating from an image that does not exist", func() {
