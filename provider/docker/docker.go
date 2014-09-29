@@ -149,14 +149,6 @@ func (p *DockerProvider) create(name, imageName, secret, configJSON string) (*pr
 		return nil, err
 	}
 
-	img, err := p.client.InspectImage(imageName)
-	if err != nil {
-		if err == dockerclient.ErrNoSuchImage {
-			return nil, provider.ErrImageNotFound
-		}
-		return nil, err
-	}
-
 	err = p.createAuthorizedKeys(name, []string{})
 	if err != nil {
 		return nil, err
@@ -175,17 +167,14 @@ func (p *DockerProvider) create(name, imageName, secret, configJSON string) (*pr
 		return nil, err
 	}
 
-	if err := p.runnableImage(img); err != nil {
-		if err != errNoCommand || len(cfg.Cmd) == 0 {
-			return nil, err
-		}
-	}
-
 	container, err := p.client.CreateContainer(dockerclient.CreateContainerOptions{
 		Name:   name,
 		Config: createConfig,
 	})
 	if err != nil {
+		if err == dockerclient.ErrNoSuchImage {
+			return nil, provider.ErrImageNotFound
+		}
 		return nil, err
 	}
 	return p.GetInfo(container.ID)
@@ -1057,25 +1046,4 @@ func containerConfigFromJSON(jsonStr string) (*provider.ContainerConfig, error) 
 
 func setDefaultContainerConfig(c *provider.ContainerConfig) {
 	c.Env = append(c.Env, fmt.Sprintf("__HOST=%s", defaultDockerGateway))
-}
-
-func (p *DockerProvider) runnableImage(img *dockerclient.Image) error {
-	cmd := img.ContainerConfig.Cmd
-
-	// when a root image has no command, its CMD will be empty slice
-	// when a child image has no command, its CMD will look like:
-	// [/bin/sh , -c , #(nop) some string from the Dockerfile] ; len 3
-	noop := len(cmd) == 3 && cmd[0] == "/bin/sh" && cmd[1] == "-c" && strings.HasPrefix(cmd[2], "#(nop)")
-	if len(img.ContainerConfig.Entrypoint) == 0 && (noop || len(cmd) == 0) {
-		if img.Parent == "" {
-			return errNoCommand
-		}
-		// check parent for CMD
-		parentImg, err := p.client.InspectImage(img.Parent)
-		if err != nil {
-			return err
-		}
-		return p.runnableImage(parentImg)
-	}
-	return nil
 }
