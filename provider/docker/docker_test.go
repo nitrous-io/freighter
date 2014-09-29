@@ -598,13 +598,14 @@ var _ = Describe("provider/docker", func() {
 				})
 			})
 
-			Describe(".Reconfig()", func() {
+			FDescribe(".Reconfig()", func() {
 				BeforeEach(func() {
 					terminateAfterTest = false
 				})
 
 				It("changes the container id and settings", func() {
 					configJSON := `{
+						"Cmd": ["/bin/sh", "-c", "yes"],
 						"Env": ["LANG=C","PAGER=more"],
 						"PortBindings": ["private:65000:3000", "public:8888:8888"]
 					}`
@@ -634,6 +635,7 @@ var _ = Describe("provider/docker", func() {
 					}
 					Expect(err).To(BeNil())
 					Expect(reconfig1.ID).NotTo(Equal(id), "container ID should be changed after recreating")
+					Expect(doInspect(reconfig1.ID, "{{.Config.Cmd}}")).To(ContainSubstring("yes"))
 					Expect(doInspect(reconfig1.ID, "{{.Config.Env}}")).To(ContainSubstring("LANG=C"))
 					Expect(doInspect(reconfig1.ID,
 						"{{range $p, $stub := .Config.ExposedPorts}}{{$p}} {{end}}")).

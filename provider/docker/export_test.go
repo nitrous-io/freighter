@@ -16,10 +16,6 @@ func (p *DockerProvider) MkHostConfig(hostCfg *dockerclient.HostConfig, cfg *pro
 	return p.mkHostConfig(hostCfg, cfg)
 }
 
-func (p *DockerProvider) RunnableImage(img *dockerclient.Image) error {
-	return p.runnableImage(img)
-}
-
 // Client exposes private client in tests
 func (p *DockerProvider) Client() *dockerclient.Client {
 	return p.client
