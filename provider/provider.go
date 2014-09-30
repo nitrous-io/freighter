@@ -64,8 +64,8 @@ type Provider interface {
 	ListImages() (infoList []*ImageInfo, err error)
 	BuildImage(opts BuildImageOptions) error
 	RemoveImage(name string) error
-	PullImage(repository string, output io.Writer, useRaw bool) error
-	PushImage(name, destination string) error
+	PullImage(repository string, output io.Writer, rawJSONStream bool) error
+	PushImage(name, destination string, output io.Writer, rawJSONStream bool) error
 	TagImage(name, tag string, force bool) error
 	InspectImage(name string) (*ImageInfo, error)
 

@@ -510,7 +510,6 @@ func (s *Server) pullImage(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	outstream := flusher.NewWriteFlusher(w)
-	// default to use raw json stream
 	if err := s.provider.PullImage(repo, outstream, true); err != nil {
 		return err
 	}
@@ -520,15 +519,15 @@ func (s *Server) pullImage(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) pushImage(w http.ResponseWriter, r *http.Request) error {
 	image := r.FormValue("image")
 	destination := r.FormValue("destination")
-	err := s.provider.PushImage(image, destination)
-	if err != nil {
+
+	outstream := flusher.NewWriteFlusher(w)
+	if err := s.provider.PushImage(image, destination, outstream, true); err != nil {
 		if err == provider.ErrImagePushAuthRequired {
 			s.respondEncodeJSON(w, http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
 			return nil
 		}
 		return err
 	}
-	s.respond(w, http.StatusOK, jsonStatusOK)
 	return nil
 }
 
