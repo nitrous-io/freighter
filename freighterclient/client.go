@@ -107,7 +107,7 @@ type Client interface {
 	BuildImage(name string, in io.Reader, out io.Writer, remote string) error
 	RemoveImage(image string) error
 	PullImage(location string, update bool, output io.Writer) error
-	PushImage(image, destination string) error
+	PushImage(image, destination string, out io.Writer) error
 	TagImage(image, newName string, force bool) error
 	InspectImage(image string) (*Image, error)
 }
@@ -918,7 +918,7 @@ func (c *client) PullImage(repository string, update bool, output io.Writer) err
 	return <-writeErrCh
 }
 
-func (c *client) PushImage(image, destination string) error {
+func (c *client) PushImage(image, destination string, out io.Writer) error {
 	u := fmt.Sprintf("%s/images/push", c.host.BaseURL())
 	data := &url.Values{
 		"image":       []string{image},
@@ -937,12 +937,40 @@ func (c *client) PushImage(image, destination string) error {
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return nil
+		// no-op
 	case http.StatusUnauthorized:
 		return ErrImagePushAuthRequired
 	default:
 		return statusError(resp)
 	}
+
+	pr, pw := io.Pipe()
+	writer := io.MultiWriter(out, pw)
+
+	// stream docker progress data to output
+	writeErrCh := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(writer, resp.Body)
+		writeErrCh <- err
+		pw.Close()
+	}()
+
+	decoder := json.NewDecoder(pr)
+	for {
+		var msg jsonMessage
+		err := decoder.Decode(&msg)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("freighter: failed to decode stream: %v", err)
+		}
+		if msg.isError() {
+			return &msg
+		}
+	}
+
+	return <-writeErrCh
 }
 
 func (c *client) TagImage(image, tag string, force bool) error {
