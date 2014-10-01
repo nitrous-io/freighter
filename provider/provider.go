@@ -41,6 +41,7 @@ type Provider interface {
 	CreateStart(name, image, secret, config string) (info *ContainerInfo, err error)
 	Commit(id, imageName string) (info *ImageInfo, err error)
 	GetInfo(id string) (info *ContainerInfo, err error)
+	GetConfig(id string) (cnrConfig *DockerConfig, cnrHostConfig *DockerHostConfig, imgConfig *DockerConfig, err error)
 	Start(id, config string) (info *ContainerInfo, err error)
 	Stop(id string) (info *ContainerInfo, err error)
 	Restart(id string) (info *ContainerInfo, err error)
@@ -105,6 +106,9 @@ type ContainerInfo struct {
 	Env        []string            `json:"-"`
 }
 
+// ContainerConfig is our internal mechanism for configuring containers.  It
+// combines elements of docker's Config and HostConfig, and functions exist to
+// generate Config and HostConfig from a given ContainerConfig
 type ContainerConfig struct {
 	Hostname     string   `json:"-"`
 	Image        string   `json:"-"`
@@ -113,6 +117,32 @@ type ContainerConfig struct {
 	Mounts       []string `json:"Mounts"`
 	PortBindings []string `json:"PortBindings"`
 	PublishAll   bool     `json:"PublishAll"`
+}
+
+// DockerConfig is fields we care about from the container's Config on Docker;
+// it is a subset of dockerclient.Config .  Note: json keys are lowercased
+// instead of camel-cased.
+type DockerConfig struct {
+	PortSpecs    []string            `json:"port_specs,omitempty"`
+	ExposedPorts map[string]struct{} `json:"exposed_ports,omitempty"`
+	Env          []string            `json:"env,omitempty"`
+	Cmd          []string            `json:"cmd,omitempty"`
+	Image        string              `json:"image,omitempty"`
+	Volumes      map[string]struct{} `json:"volumes,omitempty"`
+}
+
+type PortBinding struct {
+	HostIp   string `json:"host_ip,omitempty"`
+	HostPort string `json:"host_port,omitempty"`
+}
+
+// DockerConfig is fields we care about from the container's HostConfig on
+// Docker; it is a subset of dockerclient.HostConfig .  Note: json keys are
+// lowercased instead of camel-cased.
+type DockerHostConfig struct {
+	Binds           []string                 `json:"binds,omitempty"`
+	PortBindings    map[string][]PortBinding `json:"port_bindings,omitempty"`
+	PublishAllPorts bool                     `json:"publish_all_ports,omitempty"`
 }
 
 type ImageInfo struct {

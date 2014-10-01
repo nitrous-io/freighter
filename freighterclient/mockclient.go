@@ -35,6 +35,12 @@ type MockClient struct {
 	TerminateCalled int
 	TerminateError  error
 
+	ConfigCalled              int
+	ConfigContainerConfig     *DockerConfig
+	ConfigContainerHostConfig *DockerHostConfig
+	ConfigImageConfig         *DockerConfig
+	ConfigError               error
+
 	ReconfigCalled    int
 	ReconfigContainer *Container
 	ReconfigError     error
@@ -204,6 +210,11 @@ func (c *MockClient) Terminate(id string) (*Container, error) {
 		cntnr.State = ""
 	}
 	return cntnr, c.TerminateError
+}
+
+func (c *MockClient) Config(id string) (cnrConfig *DockerConfig, cnrHostConfig *DockerHostConfig, imgConfig *DockerConfig, err error) {
+	c.ConfigCalled++
+	return c.ConfigContainerConfig, c.ConfigContainerHostConfig, c.ConfigImageConfig, c.ConfigError
 }
 
 func (c *MockClient) Reconfig(id string, config *ContainerConfig) (*Container, error) {

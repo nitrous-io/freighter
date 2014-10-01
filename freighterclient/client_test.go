@@ -558,6 +558,88 @@ var _ = Describe("client", func() {
 		})
 	})
 
+	Describe("Config()", func() {
+		BeforeEach(func() {
+			handlers := ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", "/containers/deadbeef/config"),
+				ghttp.VerifyContentType("application/json"),
+				ghttp.RespondWithPtr(&statusCode, &responseBody),
+			)
+
+			var err error
+			st, err = NewServerTest(handlers)
+			Expect(err).To(BeNil(), "test server failed to start")
+			cl, host, server = st.client, st.host, st.server
+		})
+
+		AfterEach(func() {
+			st.Close()
+		})
+
+		It("returns container and image configs when response is HTTP 200 OK", func() {
+			statusCode = http.StatusOK
+			responseBody = `{
+				"config": {
+					"port_specs": ["4040:5050", "4000:3000"],
+					"exposed_ports": {"22/tcp":{}},
+					"env": ["NITROUS_IMAGE_VERSION=1.2.3", "PAGER=less"],
+					"cmd": ["/bin/yes"],
+					"image": "1234567",
+					"volumes": {"/shared":{}}
+				},
+				"host_config": {
+					"binds": ["/shared:/var/lib/freighter/volumes/shared"],
+					"port_bindings": {"22/tcp": [{"host_ip": "0.0.0.0", "host_port": "4040"}]},
+					"publish_all_ports": true
+				},
+				"image_config": {
+					"port_specs": ["4040:5050"],
+					"exposed_ports": {"22/tcp":{}},
+					"env": ["NITROUS_IMAGE_VERSION=1.2.3"],
+					"image": "1234567",
+					"volumes": {"/shared":{}}
+				}
+			}`
+			cnrConfig, cnrHostConfig, imgConfig, err := cl.Config("deadbeef")
+			Expect(err).To(BeNil())
+			Expect(server.ReceivedRequests()).To(HaveLen(1))
+			Expect(cnrConfig).To(Equal(&freighterclient.DockerConfig{
+				PortSpecs:    []string{"4040:5050", "4000:3000"},
+				ExposedPorts: map[string]struct{}{"22/tcp": struct{}{}},
+				Env:          []string{"NITROUS_IMAGE_VERSION=1.2.3", "PAGER=less"},
+				Cmd:          []string{"/bin/yes"},
+				Image:        "1234567",
+				Volumes:      map[string]struct{}{"/shared": struct{}{}},
+			}))
+			Expect(cnrHostConfig).To(Equal(&freighterclient.DockerHostConfig{
+				Binds: []string{"/shared:/var/lib/freighter/volumes/shared"},
+				PortBindings: map[string][]freighterclient.PortBinding{
+					"22/tcp": []freighterclient.PortBinding{
+						{HostIp: "0.0.0.0", HostPort: "4040"},
+					},
+				},
+				PublishAllPorts: true,
+			}))
+			Expect(imgConfig).To(Equal(&freighterclient.DockerConfig{
+				PortSpecs:    []string{"4040:5050"},
+				ExposedPorts: map[string]struct{}{"22/tcp": struct{}{}},
+				Env:          []string{"NITROUS_IMAGE_VERSION=1.2.3"},
+				Image:        "1234567",
+				Volumes:      map[string]struct{}{"/shared": struct{}{}},
+			}))
+		})
+
+		It("returns ErrContainerNotFound when the response is HTTP 404 Not Found", func() {
+			statusCode = http.StatusNotFound
+			cnrConfig, cnrHostConfig, imgConfig, err := cl.Config("deadbeef")
+			Expect(err).To(Equal(freighterclient.ErrContainerNotFound))
+			Expect(server.ReceivedRequests()).To(HaveLen(1))
+			Expect(cnrConfig).To(BeNil())
+			Expect(cnrHostConfig).To(BeNil())
+			Expect(imgConfig).To(BeNil())
+		})
+	})
+
 	Describe("Info()", func() {
 		BeforeEach(func() {
 			handlers := ghttp.CombineHandlers(
