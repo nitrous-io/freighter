@@ -182,10 +182,22 @@ var _ = Describe("server", func() {
 						prov.CreateError = provider.ErrImageNotFound
 					})
 
-					It("responds with 400 Not Found", func() {
+					It("responds with 404 Not Found", func() {
 						doRequest()
 						Expect(res.Code).To(Equal(http.StatusNotFound))
 						Expect(res.Body.String()).To(MatchJSON(fmt.Sprintf(`{"error":"%s"}`, provider.ErrImageNotFound.Error())))
+					})
+				})
+
+				Context("when Cmd config has an error", func() {
+					BeforeEach(func() {
+						prov.CreateError = provider.ErrCmdConfig
+					})
+
+					It("responds with 422 unprocessable entity", func() {
+						doRequest()
+						Expect(res.Code).To(Equal(422))
+						Expect(res.Body.String()).To(MatchJSON(fmt.Sprintf(`{"error":"%s"}`, provider.ErrCmdConfig.Error())))
 					})
 				})
 
