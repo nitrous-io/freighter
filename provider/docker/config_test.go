@@ -103,6 +103,22 @@ var _ = Describe("provider/docker config", func() {
 				}
 			})
 		})
+
+		Context("with Cmd config", func() {
+			BeforeEach(func() {
+				var err error
+				cfg, err = prov.MkContainerConfig(&provider.ContainerConfig{
+					Hostname: cnrName,
+					Image:    "nitrousio/php",
+					Cmd:      []string{"/bin/bash", "-c", "laravel"},
+				})
+				Expect(err).To(BeNil())
+			})
+
+			It("populates Cmd", func() {
+				Expect(cfg.Cmd).To(Equal([]string{"/bin/bash", "-c", "laravel"}))
+			})
+		})
 	})
 
 	Describe("mkHostConfig", func() {

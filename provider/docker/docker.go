@@ -30,6 +30,8 @@ var (
 	// list of images 'blessed' by Nitrous. If tag is included, the specific
 	// tag is checked for, otherwise any tag is allowed
 	nitrousImages = []string{"ubuntu-bare:trusty", "ubuntu:trusty", "ruby", "python", "nodejs", "golang", "php"}
+
+	errNoCommand = errors.New("no command specified")
 )
 
 const defaultDockerGateway = "172.17.42.1"
@@ -126,6 +128,11 @@ func (p *DockerProvider) List() ([]*provider.ContainerInfo, error) {
 func (p *DockerProvider) CreateStart(name, imageName, secret, configJSON string) (*provider.ContainerInfo, error) {
 	createdCnr, err := p.create(name, imageName, secret, configJSON)
 	if err != nil {
+		if derr, ok := err.(*dockerclient.Error); ok {
+			if strings.Contains(derr.Message, "No command specified") {
+				return nil, provider.ErrCmdConfig
+			}
+		}
 		return nil, err
 	}
 
@@ -142,13 +149,11 @@ func (p *DockerProvider) CreateStart(name, imageName, secret, configJSON string)
 }
 
 func (p *DockerProvider) create(name, imageName, secret, configJSON string) (*provider.ContainerInfo, error) {
-	err := p.storeSharedSecret(name, secret)
-	if err != nil {
+	if err := p.storeSharedSecret(name, secret); err != nil {
 		return nil, err
 	}
 
-	err = p.createAuthorizedKeys(name, []string{})
-	if err != nil {
+	if err := p.createAuthorizedKeys(name, []string{}); err != nil {
 		return nil, err
 	}
 

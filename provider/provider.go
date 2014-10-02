@@ -16,6 +16,7 @@ const (
 var containerNameRe = regexp.MustCompile(`\A[a-z][a-z0-9\-]*[a-z0-9]\z`)
 var (
 	ErrTimeout                 = errors.New("Operation timed out")
+	ErrCmdConfig               = errors.New("Container command not specified")
 	ErrPubKeyOpsNotSupported   = errors.New("Public key operations are not supported on this container")
 	ErrImageNotFound           = errors.New("Image does not exist")
 	ErrImageShared             = errors.New("Image is shared across multiple tags")
@@ -106,6 +107,7 @@ type ContainerInfo struct {
 type ContainerConfig struct {
 	Hostname     string   `json:"-"`
 	Image        string   `json:"-"`
+	Cmd          []string `json:"Cmd"`
 	Env          []string `json:"Env"`
 	Mounts       []string `json:"Mounts"`
 	PortBindings []string `json:"PortBindings"`

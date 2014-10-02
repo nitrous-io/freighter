@@ -24,16 +24,17 @@ func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig) (*dock
 		Env:          []string{},
 	}
 
-	if cfg != nil {
-		dcConfig.Env = cfg.Env
-		bs, err := dockerPortBindings(cfg.PortBindings)
-		if err != nil {
-			return nil, err
-		}
-		for port, _ := range bs {
-			dcConfig.ExposedPorts[dockerclient.Port(port)] = struct{}{}
-		}
+	dcConfig.Env = cfg.Env
+	bs, err := dockerPortBindings(cfg.PortBindings)
+	if err != nil {
+		return nil, err
 	}
+	for port, _ := range bs {
+		dcConfig.ExposedPorts[dockerclient.Port(port)] = struct{}{}
+	}
+
+	dcConfig.Cmd = make([]string, len(cfg.Cmd))
+	copy(dcConfig.Cmd, cfg.Cmd)
 
 	if isNitrousImage(cfg.Image) {
 		dcConfig.ExposedPorts[dockerclient.Port("22/tcp")] = struct{}{}
