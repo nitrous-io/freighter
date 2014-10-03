@@ -24,7 +24,7 @@ var _ = Describe("provider/docker config", func() {
 		var err error
 		datadir, err = TempDir()
 		Expect(err).To(BeNil())
-		sshBind = filepath.Join(datadir, "containers", cnrName, "ssh") + ":/etc/ssh/freighter:ro"
+		sshBind = filepath.Join(datadir, "containers", cnrName, "ssh") + ":/nitrous/ssh:ro"
 		logger := &util.Logger{Level: util.LogLevelQuiet}
 		prov, err = docker.NewDockerProvider(logger, datadir)
 		Expect(err).To(BeNil())
@@ -50,7 +50,7 @@ var _ = Describe("provider/docker config", func() {
 
 			It("has ssh volume and bind", func() {
 				Expect(cfg.Volumes).To(HaveLen(1))
-				_, ok := cfg.Volumes["/etc/ssh/freighter"]
+				_, ok := cfg.Volumes["/nitrous/ssh"]
 				Expect(ok).To(BeTrue())
 			})
 
@@ -80,7 +80,7 @@ var _ = Describe("provider/docker config", func() {
 
 			It("has Nitrous-related ssh volume settings", func() {
 				Expect(cfg.Volumes).To(HaveLen(1))
-				_, ok := cfg.Volumes["/etc/ssh/freighter"]
+				_, ok := cfg.Volumes["/nitrous/ssh"]
 				Expect(ok).To(BeTrue())
 			})
 		})

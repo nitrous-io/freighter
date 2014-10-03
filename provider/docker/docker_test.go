@@ -1171,7 +1171,7 @@ var _ = Describe("provider/docker", func() {
 			volumeDir := filepath.Join(datadir, "volumes")
 			vols := getVolumes(id)
 			Expect(vols).To(ContainSubstring(
-				fmt.Sprintf("/etc/ssh/freighter %s/%s/ssh", containerDir, name)))
+				fmt.Sprintf("/nitrous/ssh %s/%s/ssh", containerDir, name)))
 			Expect(vols).To(ContainSubstring(
 				fmt.Sprintf("/etc/dotfiles %s", filepath.Join(volumeDir, "dotfiles"))))
 			Expect(vols).To(ContainSubstring(
@@ -1189,7 +1189,7 @@ var _ = Describe("provider/docker", func() {
 			Expect(port3000Binding).To(ContainSubstring("HostPort:65000"))
 
 			vols = getVolumes(id)
-			Expect(vols).To(ContainSubstring("/etc/ssh/freighter"))
+			Expect(vols).To(ContainSubstring("/nitrous/ssh"))
 			Expect(vols).To(ContainSubstring("dotfiles"))
 			Expect(vols).To(ContainSubstring("backups"))
 
@@ -1207,7 +1207,7 @@ var _ = Describe("provider/docker", func() {
 			Expect(getPortBindings(id, "3000/tcp")).To(Equal("<no value>"))
 
 			vols = getVolumes(id)
-			Expect(vols).To(ContainSubstring("/etc/ssh/freighter"))
+			Expect(vols).To(ContainSubstring("/nitrous/ssh"))
 			Expect(vols).To(ContainSubstring("dotfiles"))
 			Expect(vols).To(ContainSubstring("restores"))
 			Expect(doInspect(id, fmt.Sprintf(
