@@ -148,7 +148,9 @@ var _ = Describe("provider/docker", func() {
 	// builds a docker image from it, returning the name of the image.
 	// If contents is zero value, it uses a default dockerfile.
 	createImages := func(count int, name string, noEntropy bool, contents string) []string {
-		pullImage(nitrousImage)
+		if contents == "" || strings.Contains(contents, nitrousImage) {
+			pullImage(nitrousImage)
+		}
 		dockerLoc, err := ioutil.TempDir("", "DockerTest")
 		Expect(err).To(BeNil())
 		dockerFile, err := os.Create(filepath.Join(dockerLoc, "Dockerfile"))
@@ -1871,26 +1873,65 @@ var _ = Describe("provider/docker", func() {
 
 	Describe("IsNitrousImage()", func() {
 		cases := []struct {
-			imageName string
-			expected  bool
+			dockerFile string
+			expected   bool
 		}{
-			{"nitrousio/ubuntu-bare:trusty", true},
-			{"nitrousio/ubuntu:trusty", true},
-			{"nitrousio/ruby:latest", true},
-			{"nitrousio/golang", true},
-			{"nitrousio/python:2.7.0", true},
-			{"nitrousio/php:hiphop", true},
-			{"nitrousio/ubuntu:gutsy", false},       // wrong tag
-			{"actionio/ruby:latest", false},         // wrong registry
-			{"nitrousio/visualbasic:latest", false}, // visualbasic not in whitelist
+			{`FROM scratch
+				MAINTAINER callum@action.io
+				ENV No WAY
+				ENV NITROUS_IMAGE_VERSION 1.1`, true},
+			{`FROM scratch
+				MAINTAINER callum@action.io
+				ENV NITROUS_IMAGE_VERSION 1.1.1.1`, true},
+			{`FROM scratch
+				MAINTAINER callum@action.io
+				ENV NOTROUS_IMAGE_VERSION 0.1`, false},
+			{`FROM scratch
+				MAINTAINER callum@action.io`, false},
+			{`FROM scratch
+				MAINTAINER callum@action.io
+				ENV SOME THING`, false},
 		}
 
 		for _, c2 := range cases {
 			c := c2
-			It(fmt.Sprintf("is %v for image '%s'", c.expected, c.imageName), func() {
-				Expect(docker.IsNitrousImage(c.imageName)).To(Equal(c.expected))
+			It(fmt.Sprintf("is %v for Dockerfile '%s'", c.expected, c.dockerFile), func() {
+				imageList := createImages(1, "isnitrous", false, c.dockerFile)
+				defer removeImages(imageList)
+				Expect(prov.IsNitrousImage(imageList[0])).To(Equal(c.expected))
 			})
 		}
+
+		It("should be true when an image inherits", func() {
+			baseDocker := `FROM scratch
+			MAINTAINER callum@action.io
+			ENV No WAY
+			ENV NITROUS_IMAGE_VERSION 1.1`
+			createdBase := createImages(1, "isnitbase", false, baseDocker)
+			defer removeImages(createdBase)
+			childDocker := fmt.Sprintf(`FROM %v
+				MAINTAINER callum@callumj.com`, createdBase[0])
+			createdChild := createImages(1, "isnitchild", false, childDocker)
+			defer removeImages(createdChild)
+
+			Expect(prov.IsNitrousImage(createdChild[0])).To(BeTrue())
+		})
+
+		It("should be true when an image overrides", func() {
+			baseDocker := `FROM scratch
+			MAINTAINER callum@action.io
+			ENV No WAY
+			ENV NITROUS_IMAGE_VERSION 1.1`
+			createdBase := createImages(1, "isnitbase", false, baseDocker)
+			defer removeImages(createdBase)
+			childDocker := fmt.Sprintf(`FROM %v
+				MAINTAINER callum@callumj.com
+				ENV NITROUS_IMAGE_VERSION 1.2`, createdBase[0])
+			createdChild := createImages(1, "isnitchild", false, childDocker)
+			defer removeImages(createdChild)
+
+			Expect(prov.IsNitrousImage(createdChild[0])).To(BeTrue())
+		})
 	})
 })
 
