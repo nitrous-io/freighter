@@ -1414,20 +1414,13 @@ var _ = Describe("server", func() {
 			handler.ServeHTTP(res, req)
 		}
 
-		It("calls provider.PushImage()", func() {
+		It("calls provider.PushImage() and responds with 200 OK", func() {
 			Expect(prov.PushImageCalled).To(BeFalse())
 			doRequest("nitrousio/ubuntu:14.04", "quay.io/me/ubuntu")
 			Expect(prov.PushImageCalled).To(BeTrue())
 			Expect(prov.ReceivedImageName).To(Equal("nitrousio/ubuntu:14.04"))
 			Expect(prov.ReceivedImageDestination).To(Equal("quay.io/me/ubuntu"))
-		})
-
-		Context("PushImage() returns successfully", func() {
-			It("responds with 200 OK", func() {
-				doRequest("nitrousio/ubuntu:14.04", "quay.io/me/ubuntu")
-				Expect(res.Code).To(Equal(http.StatusOK))
-				Expect(res.Body.String()).To(MatchJSON(`{"status":"ok"}`))
-			})
+			Expect(res.Code).To(Equal(http.StatusOK))
 		})
 
 		Context("PushImage() returns an error", func() {

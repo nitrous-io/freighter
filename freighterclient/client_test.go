@@ -155,7 +155,7 @@ var _ = Describe("client", func() {
 								"image":"yosemite",
 								"image_id":"abc123",
 								"host":"172.17.0.1",
-      							"ports": {"22": ["49100"]},
+								"ports": {"22": ["49100"]},
 								"state":"running",
 								"cmd": ["/sbin/init"],
 								"entrypoint": null,
@@ -169,7 +169,7 @@ var _ = Describe("client", func() {
 								"image":"mavericks",
 								"image_id":"def456",
 								"host":"172.17.0.2",
-      							"ports": {"22": ["49101"]},
+								"ports": {"22": ["49101"]},
 								"state":"running",
 								"cmd": ["/sbin/init"],
 								"entrypoint": null,
@@ -311,7 +311,7 @@ var _ = Describe("client", func() {
 							"image_id":"abc123",
 							"host":"172.17.0.1",
 							"gateway":"172.17.0.0",
-  							"ports": {"22": ["49100"]},
+							"ports": {"22": ["49100"]},
 							"state":"running",
 							"cmd": ["/sbin/init"],
 							"entrypoint": null,
@@ -368,7 +368,7 @@ var _ = Describe("client", func() {
 							"image_id":"abc123",
 							"host":"",
 							"gateway":"",
-  							"ports": null,
+							"ports": null,
 							"state":"stopped",
 							"cmd": ["/sbin/init"],
 							"entrypoint": null,
@@ -592,7 +592,7 @@ var _ = Describe("client", func() {
 							"image_id":"abc123",
 							"host":"172.17.0.2",
 							"gateway":"172.17.0.0",
-  							"ports": {"22": ["49100"]},
+							"ports": {"22": ["49100"]},
 							"state":"running",
 							"cmd": ["/sbin/init"],
 							"entrypoint": null,
@@ -826,7 +826,7 @@ var _ = Describe("client", func() {
 							"image_id":"abc123",
 							"host":"172.17.0.2",
 							"gateway":"172.17.0.0",
-  							"ports": {"22": ["49100"]},
+							"ports": {"22": ["49100"]},
 							"state":"running",
 							"cmd": ["/sbin/init"],
 							"entrypoint": null,
@@ -1644,7 +1644,7 @@ var _ = Describe("client", func() {
 					{"stream":" ---\u003e 4b6188aebe39\n"}
 					{"stream":"Removing intermediate container 36b1479cc2e4\n"}
 					{"stream":"Successfully built 4b6188aebe39\n"}
-			    `
+				`
 			})
 
 			It("should stream the response to the given writer", func() {
@@ -1672,7 +1672,7 @@ var _ = Describe("client", func() {
 					{"stream":"Step 0 : FROM broken\n"}
 					{"stream":" ---\u003e 4300eb9d3c8d\n"}
 					{"error":"Error...", "errorDetail":{"code": 123, "message": "Error pulling 'broken'"}}
-			    `
+				`
 			})
 
 			It("should return the error in the stream", func() {
@@ -1720,7 +1720,7 @@ var _ = Describe("client", func() {
 					{"stream":" ---\u003e 4b6188aebe39\n"}
 					{"stream":"Removing intermediate container 36b1479cc2e4\n"}
 					{"stream":"Successfully built 4b6188aebe39\n"}
-			    `
+				`
 			})
 
 			It("should make the request with remote param set", func() {
@@ -1889,27 +1889,52 @@ var _ = Describe("client", func() {
 			})
 
 			It("makes a request to Freighter to push an image", func() {
-				err := cl.PushImage("imageid", "hub.docker.com/me/imageid")
+				statusCode = http.StatusOK
+				responseBody = `
+				{"status":"The push refers to a repository [hub.docker.com/me/imageid] (len: 1)"}
+				{"status":"Sending image list"}
+				{"status":"Pushing repository hub.docker.com/me/imageid (1 tags)"}
+				{"status":"Image 511136ea3c5a already pushed, skipping"}
+				{"status":"Pushing","progressDetail":{},"id":"2e9d5ac58122"}{"status":"Buffering to disk","progressDetail":{"current":8192,"start":1412070481},"progress":"8.192 kB","id":"2e9d5ac58122"}{"status":"Buffering to disk","progressDetail":{"start":1412070481},"id":"2e9d5ac58122"}{"status":"Pushing","progressDetail":{"current":512,"total":8192,"start":1412070481},"progress":"[===\u003e                                               ]    512 B/8.192 kB 29s","id":"2e9d5ac58122"}
+				`
+
+				out := bytes.NewBuffer(nil)
+				err := cl.PushImage("imageid", "hub.docker.com/me/imageid", out)
 				Expect(err).To(BeNil())
 
 				reqs := server.ReceivedRequests()
 				Expect(reqs).To(HaveLen(1))
 				Expect(reqs[0].PostFormValue("image")).To(Equal("imageid"))
 				Expect(reqs[0].PostFormValue("destination")).To(Equal("hub.docker.com/me/imageid"))
+				Expect(out.String()).To(Equal(responseBody))
+			})
+
+			It("returns error when docker failed to push image", func() {
+				statusCode = http.StatusOK
+				responseBody = `
+				{"status":"The push refers to a repository [scratch] (len: 1)"}
+				{"status":"Sending image list"}
+				{"errorDetail":{"message":"Error: Status 401 trying to push repository scratch: \"\""},"error":"Error: Status 401 trying to push repository scratch: \"\""}
+				`
+				out := bytes.NewBuffer(nil)
+				err := cl.PushImage("myimage:tag", "scratch", out)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal("Error: Status 401 trying to push repository scratch: \"\""))
+				Expect(out.String()).To(Equal(responseBody))
 			})
 
 			Context("Error Responses", func() {
 				It("returns ErrImagePushAuthRequired when Freighter responds with HTTP 401", func() {
 					statusCode = http.StatusUnauthorized
 
-					err := cl.PushImage("imageid", "hub.docker.com/me/imageid")
+					err := cl.PushImage("imageid", "hub.docker.com/me/imageid", ioutil.Discard)
 					Expect(err).To(MatchError(freighterclient.ErrImagePushAuthRequired))
 				})
 
 				It("should surface request failures", func() {
 					st.Close()
 
-					err := cl.PushImage("imageid", "hub.docker.com/me/imageid")
+					err := cl.PushImage("imageid", "hub.docker.com/me/imageid", ioutil.Discard)
 					Expect(err).NotTo(BeNil())
 					_, ok := err.(*freighterclient.RequestFailedError)
 					Expect(ok).To(BeTrue())
@@ -1919,7 +1944,7 @@ var _ = Describe("client", func() {
 				It("should surface response failures in StatusErr", func() {
 					statusCode = http.StatusInternalServerError
 
-					err := cl.PushImage("imageid", "hub.docker.com/me/imageid")
+					err := cl.PushImage("imageid", "hub.docker.com/me/imageid", ioutil.Discard)
 					Expect(err).To(Equal(&freighterclient.StatusError{
 						Code: http.StatusInternalServerError,
 						Body: responseBody,

@@ -312,13 +312,13 @@ func (p *MockProvider) RemoveImage(name string) error {
 	return p.RemoveImageError
 }
 
-func (p *MockProvider) PullImage(repository string, stdout io.Writer, useRaw bool) error {
+func (p *MockProvider) PullImage(repository string, stdout io.Writer, rawJSONStream bool) error {
 	p.PullImageCalled = true
 	p.ReceivedRepository = repository
 	return p.PullImageError
 }
 
-func (p *MockProvider) PushImage(name, destination string) error {
+func (p *MockProvider) PushImage(name, destination string, stdout io.Writer, rawJSONStream bool) error {
 	p.PushImageCalled = true
 	p.ReceivedImageName = name
 	p.ReceivedImageDestination = destination

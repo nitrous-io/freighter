@@ -303,7 +303,7 @@ func (c *MockClient) PullImage(location string, update bool, stdout io.Writer) e
 	return c.PullImageError
 }
 
-func (c *MockClient) PushImage(slug, location string) error {
+func (c *MockClient) PushImage(slug, location string, out io.Writer) error {
 	c.PushImageCalled++
 	return c.PushImageError
 }

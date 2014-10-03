@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -656,7 +655,7 @@ func (p *DockerProvider) PullImage(location string, output io.Writer, rawJSONStr
 //   push rails to quay.io/chuyeow/railsbox
 //   push quay.io/chuyeow/rails
 //   push quay.io/chuyeow/rails to tsuru.io/nitrous/railsbox
-func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
+func (p *DockerProvider) PushImage(imageIDOrName, dest string, output io.Writer, rawJSONStream bool) error {
 	lookupResult, err := p.lookupImage(imageIDOrName)
 	if err != nil {
 		return err
@@ -679,19 +678,18 @@ func (p *DockerProvider) PushImage(imageIDOrName, dest string) error {
 		return provider.ErrImagePushAuthRequired
 	}
 
-	err = p.dockerTag(image.ID, dest, true)
-	if err != nil {
+	if err := p.dockerTag(image.ID, dest, true); err != nil {
 		return err
 	}
 
 	repository, tag := parsers.ParseRepoAndTag(dest)
-	var buf bytes.Buffer
 	// while PushImageOptions contains a Registry attribute, it does not work
 	// docker push XXXXXX calls the API with the full name (registry and repository) as the image name
 	pushOpts := dockerclient.PushImageOptions{
-		Name:         repository,
-		Tag:          tag,
-		OutputStream: &buf,
+		Name:          repository,
+		Tag:           tag,
+		OutputStream:  output,
+		RawJSONStream: rawJSONStream,
 	}
 
 	return p.DockerClientProxy.PushImage(pushOpts, auth)
