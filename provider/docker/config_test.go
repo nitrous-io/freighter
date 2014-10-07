@@ -39,7 +39,7 @@ var _ = Describe("provider/docker config", func() {
 				cfg, err = prov.MkContainerConfig(&provider.ContainerConfig{
 					Hostname: cnrName,
 					Image:    "nitrousio/php", // Nitrous image.
-				})
+				}, true)
 				Expect(err).To(BeNil())
 			})
 
@@ -70,7 +70,7 @@ var _ = Describe("provider/docker config", func() {
 				cfg, err = prov.MkContainerConfig(&provider.ContainerConfig{
 					Hostname: cnrName,
 					Image:    "custom-image",
-				})
+				}, false)
 				Expect(err).To(BeNil())
 			})
 
@@ -92,7 +92,7 @@ var _ = Describe("provider/docker config", func() {
 					Hostname:     cnrName,
 					Image:        "nitrousio/php",
 					PortBindings: []string{"public::4000", "3000:8080", "private:5000:5001", "127.0.0.1:5002:5002"},
-				})
+				}, true)
 				Expect(err).To(BeNil())
 			})
 
@@ -111,7 +111,7 @@ var _ = Describe("provider/docker config", func() {
 					Hostname: cnrName,
 					Image:    "nitrousio/php",
 					Cmd:      []string{"/bin/bash", "-c", "laravel"},
-				})
+				}, true)
 				Expect(err).To(BeNil())
 			})
 
@@ -142,7 +142,7 @@ var _ = Describe("provider/docker config", func() {
 				hostCfg, err = prov.MkHostConfig(oldHostCfg, &provider.ContainerConfig{
 					Hostname: cnrName,
 					Image:    "nitrousio/php", // Nitrous image.
-				})
+				}, true)
 				Expect(err).To(BeNil())
 			})
 
@@ -164,7 +164,7 @@ var _ = Describe("provider/docker config", func() {
 				hostCfg, err = prov.MkHostConfig(oldHostCfg, &provider.ContainerConfig{
 					Hostname: cnrName,
 					Image:    "not/nitrous",
-				})
+				}, false)
 				Expect(err).To(BeNil())
 			})
 
@@ -180,7 +180,7 @@ var _ = Describe("provider/docker config", func() {
 		Context("Mounts config handling (always keeps ssh bind)", func() {
 			getCfg := func(cfg *provider.ContainerConfig) *dockerclient.HostConfig {
 				var err error
-				hostCfg, err = prov.MkHostConfig(oldHostCfg, cfg)
+				hostCfg, err = prov.MkHostConfig(oldHostCfg, cfg, true)
 				Expect(err).To(BeNil())
 				return hostCfg
 			}
@@ -233,7 +233,7 @@ var _ = Describe("provider/docker config", func() {
 						Hostname:     cnrName,
 						Image:        "nitrousio/php", // Nitrous image.
 						PortBindings: []string{"public::4000", "3000:8080", "private:5000:5001"},
-					})
+					}, true)
 				Expect(err).To(BeNil())
 			})
 
@@ -266,7 +266,7 @@ var _ = Describe("provider/docker config", func() {
 						Hostname:   cnrName,
 						Image:      "nitrousio/php", // Nitrous image.
 						PublishAll: true,
-					})
+					}, true)
 				Expect(err).To(BeNil())
 			})
 

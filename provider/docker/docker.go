@@ -34,6 +34,7 @@ var (
 )
 
 const defaultDockerGateway = "172.17.42.1"
+const nitrousImageEnv = "NITROUS_IMAGE_VERSION"
 
 func init() {
 	if host := os.Getenv("DOCKER_HOST"); host != "" {
@@ -164,7 +165,7 @@ func (p *DockerProvider) create(name, imageName, secret, configJSON string) (*pr
 	cfg.Hostname = name
 	cfg.Image = imageName
 
-	createConfig, err := p.mkContainerConfig(cfg)
+	createConfig, err := p.mkContainerConfig(cfg, p.isNitrousImage(cfg.Image))
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +244,7 @@ func (p *DockerProvider) Start(id, configJSON string) (*provider.ContainerInfo, 
 	cfg.Hostname = container.Config.Hostname
 	cfg.Image = container.Config.Image
 
-	startConfig, err := p.mkHostConfig(container.HostConfig, cfg)
+	startConfig, err := p.mkHostConfig(container.HostConfig, cfg, p.isNitrousImage(cfg.Image))
 	if err != nil {
 		return nil, err
 	}
@@ -833,7 +834,7 @@ func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, e
 	}
 	for _, image := range images {
 		if image.ID == imageIDOrName {
-			return lookupImageResult{image: image, byID: true}, nil
+			return lookupImageResult{image: image}, nil
 		} else {
 			if repository == image.Name && tag == image.Tag {
 				return lookupImageResult{image: image}, nil
@@ -932,6 +933,25 @@ func (p *DockerProvider) dockerTag(image string, newName string, force bool) err
 	})
 }
 
+func (p *DockerProvider) isNitrousImage(fullName string) bool {
+	imageInfo, err := p.client.InspectImage(fullName)
+	if err != nil {
+		return false
+	}
+
+	if imageInfo.Config == nil {
+		return false
+	}
+
+	for _, val := range imageInfo.Config.Env {
+		split := strings.SplitN(val, "=", 2)
+		if len(split) == 2 && split[0] == nitrousImageEnv {
+			return true
+		}
+	}
+	return false
+}
+
 func nameFromContainer(container *dockerclient.Container) string {
 	return container.Name[1:]
 }
@@ -992,27 +1012,6 @@ func keysToKeyMap(keys []string) (map[string]string, error) {
 		keymap[fingerprint] = key
 	}
 	return keymap, nil
-}
-
-func isNitrousImage(fullName string) bool {
-	parts := strings.Split(fullName, ":")
-	untagged := fullName
-	if len(parts) == 2 {
-		untagged = parts[0]
-	}
-	for _, nitrousImage := range nitrousImages {
-		var matched bool
-		current := registryName + "/" + nitrousImage
-		if strings.Index(current, ":") == -1 {
-			matched = current == untagged
-		} else {
-			matched = current == fullName
-		}
-		if matched == true {
-			return true
-		}
-	}
-	return false
 }
 
 // converts map[keyFingerprint]pubkey back to []pubkey

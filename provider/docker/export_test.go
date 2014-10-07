@@ -8,12 +8,12 @@ import (
 	"github.com/nitrous-io/freighter/util"
 )
 
-func (p *DockerProvider) MkContainerConfig(cfg *provider.ContainerConfig) (*dockerclient.Config, error) {
-	return p.mkContainerConfig(cfg)
+func (p *DockerProvider) MkContainerConfig(cfg *provider.ContainerConfig, isNitrousImage bool) (*dockerclient.Config, error) {
+	return p.mkContainerConfig(cfg, isNitrousImage)
 }
 
-func (p *DockerProvider) MkHostConfig(hostCfg *dockerclient.HostConfig, cfg *provider.ContainerConfig) (*dockerclient.HostConfig, error) {
-	return p.mkHostConfig(hostCfg, cfg)
+func (p *DockerProvider) MkHostConfig(hostCfg *dockerclient.HostConfig, cfg *provider.ContainerConfig, isNitrousImage bool) (*dockerclient.HostConfig, error) {
+	return p.mkHostConfig(hostCfg, cfg, isNitrousImage)
 }
 
 // Client exposes private client in tests
@@ -21,7 +21,9 @@ func (p *DockerProvider) Client() *dockerclient.Client {
 	return p.client
 }
 
-var IsNitrousImage = isNitrousImage
+func (p *DockerProvider) IsNitrousImage(fullName string) bool {
+	return p.isNitrousImage(fullName)
+}
 
 // Specify another docker host instead of the default unix socket
 // This is useful when we want to inject a fake docker host or when we want to

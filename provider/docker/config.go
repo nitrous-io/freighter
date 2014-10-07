@@ -15,7 +15,7 @@ var (
 	ErrInvalidMountSpec = fmt.Errorf("volume specification invalid")
 )
 
-func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig) (*dockerclient.Config, error) {
+func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig, isTrustedImage bool) (*dockerclient.Config, error) {
 	dcConfig := &dockerclient.Config{
 		Hostname:     cfg.Hostname,
 		Image:        cfg.Image,
@@ -38,7 +38,7 @@ func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig) (*dock
 	dcConfig.Cmd = make([]string, len(cfg.Cmd))
 	copy(dcConfig.Cmd, cfg.Cmd)
 
-	if isNitrousImage(cfg.Image) {
+	if isTrustedImage {
 		dcConfig.ExposedPorts[dockerclient.Port("22/tcp")] = struct{}{}
 	}
 	dcConfig.Volumes["/nitrous/ssh"] = struct{}{}
@@ -46,7 +46,7 @@ func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig) (*dock
 	return dcConfig, nil
 }
 
-func (p *DockerProvider) mkHostConfig(hostCfg *dockerclient.HostConfig, cfg *provider.ContainerConfig) (*dockerclient.HostConfig, error) {
+func (p *DockerProvider) mkHostConfig(hostCfg *dockerclient.HostConfig, cfg *provider.ContainerConfig, isTrustedImage bool) (*dockerclient.HostConfig, error) {
 	newCfg := dockerclient.HostConfig{}
 	if hostCfg != nil {
 		newCfg = *hostCfg
@@ -78,7 +78,7 @@ func (p *DockerProvider) mkHostConfig(hostCfg *dockerclient.HostConfig, cfg *pro
 		}
 		newCfg.Binds = ms
 	}
-	if isNitrousImage(cfg.Image) {
+	if isTrustedImage {
 		newCfg.PublishAllPorts = true
 	}
 
