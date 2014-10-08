@@ -834,7 +834,7 @@ func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, e
 	}
 	for _, image := range images {
 		if image.ID == imageIDOrName {
-			return lookupImageResult{image: image}, nil
+			return lookupImageResult{image: image, byID: true}, nil
 		} else {
 			if repository == image.Name && tag == image.Tag {
 				return lookupImageResult{image: image}, nil

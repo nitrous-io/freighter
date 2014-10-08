@@ -1391,8 +1391,8 @@ var _ = Describe("provider/docker", func() {
 				})
 			})
 
-			Context("with multiple images under ID", func() {
-				It("should not allow for deletion", func() {
+			Context("with multiple images with the same ID", func() {
+				It("should not allow for deletion by ID", func() {
 					i1 := createImages(1, "multremovable", true, "")
 					defer removeImages(i1)
 					i2 := createImages(1, "multremovable2", true, "")
