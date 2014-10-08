@@ -244,7 +244,7 @@ var _ = Describe("provider/docker", func() {
 		Context("when image has no CMD or ENTRYPOINT", func() {
 			It("creates and starts if CMD is given to container config", func() {
 				imgs := createImages(1, "nocmd", false, `
-					FROM busybox
+					FROM busybox:latest
 					CMD []
 				`)
 				defer removeImages(imgs)
