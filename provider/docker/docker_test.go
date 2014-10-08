@@ -875,14 +875,22 @@ var _ = Describe("provider/docker", func() {
 
 					expectSSHToWork := func(port, sshkeypath string) {
 						time.Sleep(2 * time.Second)
-						out, err := exec.Command("ssh", sshTarget(), "-i", sshkeypath, "-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
+						out, err := exec.Command("ssh", sshTarget(), "-i", sshkeypath, "-p", port,
+							"-o", "StrictHostKeyChecking=no",
+							"-o", "UserKnownHostsFile=/dev/null",
+							"-o", "PasswordAuthentication=no",
+							"echo success").CombinedOutput()
 						Expect(out).To(ContainSubstring("success"))
 						Expect(err).To(BeNil())
 					}
 
 					expectSSHToNotWork := func(port, sshkeypath string) {
 						time.Sleep(2 * time.Second)
-						out, err := exec.Command("ssh", sshTarget(), "-i", sshkeypath, "-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "echo success").CombinedOutput()
+						out, err := exec.Command("ssh", sshTarget(), "-i", sshkeypath, "-p", port,
+							"-o", "StrictHostKeyChecking=no",
+							"-o", "UserKnownHostsFile=/dev/null",
+							"-o", "PasswordAuthentication=no",
+							"echo success").CombinedOutput()
 						Expect(out).To(ContainSubstring("Permission denied"))
 						Expect(err).ToNot(BeNil())
 					}
