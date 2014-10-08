@@ -74,7 +74,8 @@ type Provider interface {
 	RemoveVolume(slug string) error
 	GetVolumeInfo(slug string) (*VolumeInfo, error)
 
-	AttachToContainer(id string, in io.Reader, out io.Writer) error
+	AttachToContainer(id string, in io.Reader, out io.Writer, noStdin bool) error
+	ResizeContainerTTY(id string, height, width int) error
 }
 
 // StartFailedError is returned when a container is created successfully but

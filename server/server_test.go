@@ -1003,79 +1003,6 @@ var _ = Describe("server", func() {
 		})
 	})
 
-	Describe("GET /containers/:id/logs", func() {
-		doRequest := func(id, token, follow, timestamps, tail string) {
-			params := &url.Values{}
-			params.Set("follow", follow)
-			params.Set("timestamps", timestamps)
-			params.Set("tail", tail)
-			req, err := NewRequestWithSecret(hostSecret, "GET", fmt.Sprintf("/containers/%v/logs", id), params)
-			Expect(err).To(BeNil())
-			if token != "" {
-				req.Header.Set("Authorization", "Token "+token)
-			}
-			handler.ServeHTTP(res, req)
-		}
-
-		It("requires a container token", func() {
-			token := ""
-			doRequest("test-container", token, "false", "false", "")
-			Expect(res.Code).To(Equal(http.StatusUnauthorized))
-		})
-
-		It("requires a valid container token", func() {
-			prov.VerifyTokenError = errors.New("invalid token")
-			token := "some token"
-			doRequest("test-container", token, "false", "false", "")
-			Expect(res.Code).To(Equal(http.StatusUnauthorized))
-			Expect(prov.ReceivedID).To(Equal("test-container"))
-			Expect(prov.ReceivedToken).To(Equal(token))
-			Expect(prov.ReceivedPermissions).To(Equal([]string{"logs"}))
-		})
-
-		It("ignore invalid parameters", func() {
-			testCases := []struct {
-				follow     string
-				timestamps string
-				status     int
-			}{
-				{"", "", 200},
-				{"invalid", "bool", 200},
-			}
-			for _, tc := range testCases {
-				doRequest("test-container", "container-token", tc.follow, tc.timestamps, "tail-value")
-				Expect(res.Code).To(Equal(tc.status), "Unexpected status %+v for %+v", res.Code, tc)
-				Expect(prov.ReceivedID).To(Equal("test-container"), "Unexpected id for %+v", tc)
-				Expect(prov.ReceivedToken).To(Equal("container-token"), "unexpected token for %+v", tc)
-				Expect(prov.ReceivedFollow).To(BeFalse(), "Unexpected follow for %+v", tc)
-				Expect(prov.ReceivedTimestamps).To(BeFalse(), "Unexpected timestamps for %+v", tc)
-			}
-		})
-
-		It("accepts any value for tail", func() {
-			doRequest("test-container", "container-token", "true", "false", "tail-value")
-			Expect(res.Code).To(Equal(200), "Unexpected status %v", res.Code)
-			Expect(prov.ReceivedTail).To(Equal("tail-value"))
-		})
-
-		It("accepts valid parameters for follow and timestamps", func() {
-			testCases := []struct {
-				follow             string
-				timestamps         string
-				expectedFollow     bool
-				expectedTimestamps bool
-			}{
-				{"1", "1", true, true},
-				{"true", "false", true, false},
-			}
-			for _, tc := range testCases {
-				doRequest("test-container", "container-token", tc.follow, tc.timestamps, "tail-value")
-				Expect(prov.ReceivedFollow).To(Equal(tc.expectedFollow), "Unexpected follow for %v", tc)
-				Expect(prov.ReceivedTimestamps).To(Equal(tc.expectedTimestamps), "Unexpected timestamps for %v", tc)
-			}
-		})
-	})
-
 	Describe("GET /images", func() {
 		doRequest := func() {
 			req, err = NewRequestWithSecret(hostSecret, "GET", "/images", nil)
@@ -1522,13 +1449,32 @@ var _ = Describe("server", func() {
 		})
 	})
 
-	Describe("GET /containers/:id/attach/ws", func() {
+	itHandlesCORSPreflight := func(url string) {
+		It("handles CORS preflight", func() {
+			req, err := NewRequest("OPTIONS", url, nil)
+			Expect(err).To(BeNil())
+			req.Header.Set("Access-Control-Request-Headers", "Foo")
+			req.Header.Add("Access-Control-Request-Headers", "Bar")
+			handler.ServeHTTP(res, req)
+			Expect(res.Code).To(Equal(http.StatusOK))
+			Expect(res.Header()["Access-Control-Allow-Origin"]).To(ContainElement("*"))
+			Expect(res.Header()["Access-Control-Allow-Methods"]).To(ContainElement("*"))
+			Expect(res.Header()["Access-Control-Allow-Headers"]).To(ContainElement("Foo, Bar"))
+			Expect(res.Header()["Access-Control-Allow-Credentials"]).To(ContainElement("true"))
+		})
+	}
+
+	Describe("OPTIONS /containers/:id/attach", func() {
+		itHandlesCORSPreflight("/containers/1/shell")
+	})
+
+	Describe("GET /containers/:id/attach", func() {
 		doRequest := func(containerID, token string) (*websocket.Conn, error) {
 			ts := httptest.NewServer(handler)
 			defer ts.Close()
 			params := &url.Values{}
 			params.Set("token", token)
-			wsURL, err := url.Parse(fmt.Sprintf("ws://%s/containers/%s/attach/ws", ts.Listener.Addr().String(), containerID))
+			wsURL, err := url.Parse(fmt.Sprintf("ws://%s/containers/%s/attach", ts.Listener.Addr().String(), containerID))
 			if err != nil {
 				return nil, err
 			}
@@ -1596,10 +1542,10 @@ var _ = Describe("server", func() {
 				messageType, msg, err := conn.ReadMessage()
 				Expect(err).To(BeNil())
 				Expect(messageType).To(Equal(websocket.TextMessage))
-				Expect(string(msg)).To(Equal("attach output"))
+				Expect(string(msg)).To(Equal("d|attach output"))
 			})
 
-			It("writes the error to WebSocket when there is an error", func() {
+			It("sends a close message with the error to WebSocket when there is an error", func() {
 				prov.Containers = []*provider.ContainerInfo{{ID: "container-id", State: provider.ContainerStateRunning}}
 				prov.AttachToContainerError = errors.New("some attach error")
 
@@ -1613,30 +1559,15 @@ var _ = Describe("server", func() {
 				for {
 					messageType, msg, err := conn.ReadMessage()
 					Expect(err).To(BeNil())
-					if messageType != websocket.TextMessage || string(msg) == "" {
+					if messageType != websocket.TextMessage || string(msg[2:]) == "" {
 						continue
 					}
-					Expect(string(msg)).To(Equal("some attach error"))
+					Expect(string(msg)).To(Equal("c|an error occurred"))
 					break
 				}
 			})
 		})
 	})
-
-	itHandlesCORSPreflight := func(url string) {
-		It("handles CORS preflight", func() {
-			req, err := NewRequest("OPTIONS", url, nil)
-			Expect(err).To(BeNil())
-			req.Header.Set("Access-Control-Request-Headers", "Foo")
-			req.Header.Add("Access-Control-Request-Headers", "Bar")
-			handler.ServeHTTP(res, req)
-			Expect(res.Code).To(Equal(http.StatusOK))
-			Expect(res.Header()["Access-Control-Allow-Origin"]).To(ContainElement("*"))
-			Expect(res.Header()["Access-Control-Allow-Methods"]).To(ContainElement("*"))
-			Expect(res.Header()["Access-Control-Allow-Headers"]).To(ContainElement("Foo, Bar"))
-			Expect(res.Header()["Access-Control-Allow-Credentials"]).To(ContainElement("true"))
-		})
-	}
 
 	Describe("OPTIONS /containers/:id/shell", func() {
 		itHandlesCORSPreflight("/containers/1/shell")
@@ -1668,6 +1599,103 @@ var _ = Describe("server", func() {
 			Expect(err).To(Equal(websocket.ErrBadHandshake))
 			Expect(prov.ReceivedToken).To(Equal(token))
 			Expect(prov.ReceivedPermissions).To(Equal([]string{"shell"}))
+		})
+	})
+
+	Describe("OPTIONS /containers/:id/logs", func() {
+		itHandlesCORSPreflight("/containers/1/logs")
+	})
+
+	Describe("GET /containers/:id/logs", func() {
+		doRequest := func(containerID, token, follow, timestamps, tail string) (*websocket.Conn, error) {
+			ts := httptest.NewServer(handler)
+			defer ts.Close()
+			params := &url.Values{}
+			params.Set("token", token)
+			params.Set("follow", follow)
+			params.Set("timestamps", timestamps)
+			params.Set("tail", tail)
+			wsURL, err := url.Parse(fmt.Sprintf("ws://%s/containers/%s/logs", ts.Listener.Addr().String(), containerID))
+			if err != nil {
+				return nil, err
+			}
+			wsURL.RawQuery = params.Encode()
+			conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), http.Header{})
+			return conn, err
+		}
+
+		It("requires a container token", func() {
+			token := ""
+			_, err := doRequest("test-container", token, "false", "false", "")
+			Expect(err).To(Equal(websocket.ErrBadHandshake))
+		})
+
+		It("requires a valid container token", func() {
+			prov.VerifyTokenError = errors.New("invalid token")
+			token := "some token"
+			_, err := doRequest("test-container", token, "false", "false", "")
+			Expect(err).To(Equal(websocket.ErrBadHandshake))
+			Expect(prov.ReceivedID).To(Equal("test-container"))
+			Expect(prov.ReceivedToken).To(Equal(token))
+			Expect(prov.ReceivedPermissions).To(Equal([]string{"logs"}))
+		})
+
+		It("ignore invalid parameters", func() {
+			testCases := []struct {
+				follow     string
+				timestamps string
+				status     int
+			}{
+				{"", "", 200},
+				{"invalid", "bool", 200},
+			}
+			for _, tc := range testCases {
+				_, err := doRequest("test-container", "container-token", tc.follow, tc.timestamps, "tail-value")
+				Expect(err).To(BeNil())
+				Expect(prov.ReceivedID).To(Equal("test-container"), "Unexpected id for %+v", tc)
+				Expect(prov.ReceivedToken).To(Equal("container-token"), "unexpected token for %+v", tc)
+				Expect(prov.ReceivedFollow).To(BeFalse(), "Unexpected follow for %+v", tc)
+				Expect(prov.ReceivedTimestamps).To(BeFalse(), "Unexpected timestamps for %+v", tc)
+			}
+		})
+
+		It("accepts any value for tail", func() {
+			_, err := doRequest("test-container", "container-token", "true", "false", "tail-value")
+			Expect(err).To(BeNil())
+			Expect(prov.ReceivedTail).To(Equal("tail-value"))
+		})
+
+		It("accepts valid parameters for follow and timestamps", func() {
+			testCases := []struct {
+				follow             string
+				timestamps         string
+				expectedFollow     bool
+				expectedTimestamps bool
+			}{
+				{"1", "1", true, true},
+				{"true", "false", true, false},
+			}
+			for _, tc := range testCases {
+				_, err := doRequest("test-container", "container-token", tc.follow, tc.timestamps, "tail-value")
+				Expect(err).To(BeNil())
+				Expect(prov.ReceivedFollow).To(Equal(tc.expectedFollow), "Unexpected follow for %v", tc)
+				Expect(prov.ReceivedTimestamps).To(Equal(tc.expectedTimestamps), "Unexpected timestamps for %v", tc)
+			}
+		})
+
+		It("streams log output in messages following socket protocol", func() {
+			prov.WriteToLogsStream = "sample log output"
+			conn, err := doRequest("test-container", "container-token", "1", "1", "tail-value")
+			Expect(err).To(BeNil())
+			defer conn.Close()
+
+			Expect(prov.ReceivedID).To(Equal("test-container"))
+			Expect(prov.ReceivedToken).To(Equal("container-token"))
+
+			messageType, msg, err := conn.ReadMessage()
+			Expect(err).To(BeNil())
+			Expect(messageType).To(Equal(websocket.TextMessage))
+			Expect(string(msg)).To(Equal("d|sample log output"))
 		})
 	})
 

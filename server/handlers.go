@@ -315,7 +315,7 @@ func (s *Server) exportContainer(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) getContainerLogs(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) wsContainerLogs(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
 
 	// convert to bool, ignore the errors as the value will be false when error
@@ -324,16 +324,21 @@ func (s *Server) getContainerLogs(w http.ResponseWriter, r *http.Request) error 
 	timestamps, _ := strconv.ParseBool(r.FormValue("timestamps"))
 	tail := r.FormValue("tail")
 
-	w.Header().Set("Content-Type", "application/vnd.docker.raw-stream")
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return fmt.Errorf("failed to upgrade websocket: %v", err)
+	}
+	stream := wsconn.NewConnectionHeartbeat(conn, true)
+	defer stream.Close()
 
-	outstream := flusher.NewWriteFlusher(w)
-	return s.provider.Logs(id, outstream, follow, timestamps, tail)
+	return s.provider.Logs(id, shell.NewShellWriter(stream), follow, timestamps, tail)
 }
 
 // wsNewShell creates a new shell to a container using protocol specified in
 // pkg/shell/protocol.go
 func (s *Server) wsNewShell(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
+
 	info, err := s.provider.GetInfo(id)
 	if err != nil {
 		return err
@@ -569,20 +574,50 @@ func (s *Server) wsAttachToContainer(w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("Cannot attach to stopped container %v", info.ID)
 	}
 
+	// check if the client request to use BinaryMessage instead of TextMessage
+	binary, _ := strconv.ParseBool(r.FormValue("binary"))
+	// if no-stdin in param is set, STDIN should not be attached
+	noStdin, _ := strconv.ParseBool(r.FormValue("nostdin"))
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade websocket: %v", err)
 	}
-	stream := wsconn.NewConnection(conn)
+	stream := wsconn.NewConnectionHeartbeat(conn, true)
+	if binary {
+		stream.MessageType = websocket.BinaryMessage
+	}
 	defer stream.Close()
 
-	if err := s.provider.AttachToContainer(id, stream, stream); err != nil {
-		// Connection is already hijacked, so write to the WebSocket instead of
-		// returning the error.
-		stream.Write([]byte(err.Error()))
-	}
+	// create stdin/stdout stream with the shell protocol
+	msgCh := make(chan shell.Message, messageQueueSize)
+	stdin := shell.NewShellReader(conn, msgCh, stream.MessageType)
+	stdout := shell.NewShellWriter(stream)
+	exit := make(chan struct{})
 
-	return nil
+	go func() {
+		defer close(exit)
+		if err := s.provider.AttachToContainer(id, stdin, stdout, noStdin); err != nil {
+			// Connection is already hijacked,
+			// log the error and close the connection
+			s.logger.Errorf("attach: %s", err)
+			stream.Write([]byte("c|an error occurred"))
+		}
+	}()
+
+	for {
+		select {
+		case <-exit:
+			return nil
+		case msg := <-msgCh:
+			switch msg := msg.(type) {
+			case *shell.ResizeMsg:
+				err = s.provider.ResizeContainerTTY(id, msg.Height, msg.Width)
+			default:
+				s.logger.Info("attach: got unknown msg %v", msg)
+			}
+		}
+	}
 }
 
 func randomString() string {

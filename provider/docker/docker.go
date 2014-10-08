@@ -492,6 +492,7 @@ func (p *DockerProvider) Logs(id string, w io.Writer, follow, timestamps bool, t
 		Tail:         tail,
 		OutputStream: w,
 		ErrorStream:  w,
+		RawTerminal:  true,
 	})
 }
 
@@ -731,7 +732,7 @@ func (p *DockerProvider) InspectImage(name string) (*provider.ImageInfo, error) 
 	return lookupResult.image, nil
 }
 
-func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Writer) error {
+func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Writer, noStdin bool) error {
 	container, err := p.inspectContainer(id)
 	if err != nil {
 		return err
@@ -743,10 +744,20 @@ func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Write
 		OutputStream: out,
 		ErrorStream:  out,
 		Stream:       true,
-		Stdin:        true,
+		Stdin:        !noStdin,
 		Stdout:       true,
 		Stderr:       true,
+		RawTerminal:  true,
 	})
+}
+
+func (p *DockerProvider) ResizeContainerTTY(id string, height, width int) error {
+	container, err := p.inspectContainer(id)
+	if err != nil {
+		return err
+	}
+
+	return p.client.ResizeContainerTTY(container.ID, height, width)
 }
 
 type authconfig struct {

@@ -84,6 +84,7 @@ type MockProvider struct {
 	ReceivedFollow     bool
 	ReceivedTimestamps bool
 	ReceivedTail       string
+	WriteToLogsStream  string
 
 	LoginCalled      bool
 	LoginError       error
@@ -125,9 +126,15 @@ type MockProvider struct {
 	InspectImageReturn *provider.ImageInfo
 	InspectImageError  error
 
-	AttachToContainerCalled bool
-	AttachToContainerError  error
-	WriteToStdout           string
+	AttachToContainerCalled  bool
+	AttachToContainerError   error
+	AttachToContainerNostdin bool
+	WriteToStdout            string
+
+	ResizeContainerTTYCalled bool
+	ResizeContainerTTYError  error
+	ResizeContainerTTYHeight int
+	ResizeContainerTTYWidth  int
 
 	Containers []*provider.ContainerInfo
 	PublicKeys map[string]string
@@ -264,6 +271,7 @@ func (p *MockProvider) Logs(id string, w io.Writer, follow, timestamps bool, tai
 	p.ReceivedFollow = follow
 	p.ReceivedTimestamps = timestamps
 	p.ReceivedTail = tail
+	w.Write([]byte(p.WriteToLogsStream))
 	return p.LogsError
 }
 
@@ -359,11 +367,20 @@ func (p *MockProvider) GetVolumeInfo(slug string) (*provider.VolumeInfo, error) 
 	return p.VolumeInfoReturn, p.VolumeInfoError
 }
 
-func (p *MockProvider) AttachToContainer(id string, stdin io.Reader, stdout io.Writer) error {
+func (p *MockProvider) AttachToContainer(id string, stdin io.Reader, stdout io.Writer, noStdin bool) error {
 	p.AttachToContainerCalled = true
 	p.ReceivedID = id
+	p.AttachToContainerNostdin = noStdin
 	stdout.Write([]byte(p.WriteToStdout))
 	return p.AttachToContainerError
+}
+
+func (p *MockProvider) ResizeContainerTTY(id string, height, width int) error {
+	p.ResizeContainerTTYCalled = true
+	p.ReceivedID = id
+	p.ResizeContainerTTYHeight = height
+	p.ResizeContainerTTYWidth = width
+	return p.ResizeContainerTTYError
 }
 
 func (p *MockProvider) IsNotFoundError(err error) bool {
