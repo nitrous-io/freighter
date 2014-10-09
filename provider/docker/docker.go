@@ -206,6 +206,32 @@ func (p *DockerProvider) Commit(id, imageName string) (*provider.ImageInfo, erro
 	return info.image, nil
 }
 
+// GetConfig returns (container config, container host config, image config, error)
+func (p *DockerProvider) GetConfig(id string) (*provider.DockerConfig, *provider.DockerHostConfig, *provider.DockerConfig, error) {
+	cnr, err := p.inspectContainer(id)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	img, err := p.client.InspectImage(cnr.Image)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	cnrHostConfig := &provider.DockerHostConfig{
+		PortBindings:    map[string][]provider.PortBinding{},
+		Binds:           cnr.HostConfig.Binds,
+		PublishAllPorts: cnr.HostConfig.PublishAllPorts,
+	}
+	for k, pbSlice := range cnr.HostConfig.PortBindings {
+		for _, pb := range pbSlice {
+			cnrHostConfig.PortBindings[string(k)] = append(cnrHostConfig.PortBindings[string(k)], provider.PortBinding{
+				HostIp:   pb.HostIp,
+				HostPort: pb.HostPort,
+			})
+		}
+	}
+	return convertConfig(cnr.Config), cnrHostConfig, convertConfig(img.Config), nil
+}
+
 func (p *DockerProvider) GetInfo(id string) (*provider.ContainerInfo, error) {
 	container, err := p.inspectContainer(id)
 	if err != nil {
@@ -220,13 +246,13 @@ func (p *DockerProvider) GetInfo(id string) (*provider.ContainerInfo, error) {
 		Host:       container.NetworkSettings.IPAddress,
 		Gateway:    container.NetworkSettings.Gateway,
 		Ports:      portsFromContainer(container),
+		Env:        container.Config.Env,
 		State:      stateFromContainer(container),
 		Cmd:        container.Config.Cmd,
 		Entrypoint: container.Config.Entrypoint,
 		ExitCode:   container.State.ExitCode,
 		StartedAt:  container.State.StartedAt,
 		FinishedAt: container.State.FinishedAt,
-		Env:        container.Config.Env,
 	}, nil
 }
 
@@ -1050,4 +1076,19 @@ func containerConfigFromJSON(jsonStr string) (*provider.ContainerConfig, error) 
 
 func setDefaultContainerConfig(c *provider.ContainerConfig) {
 	c.Env = append(c.Env, fmt.Sprintf("__HOST=%s", defaultDockerGateway))
+}
+
+func convertConfig(dcConfig *dockerclient.Config) *provider.DockerConfig {
+	cnrConfig := &provider.DockerConfig{
+		ExposedPorts: map[string]struct{}{},
+		PortSpecs:    dcConfig.PortSpecs,
+		Env:          dcConfig.Env,
+		Cmd:          dcConfig.Cmd,
+		Image:        dcConfig.Image,
+		Volumes:      dcConfig.Volumes,
+	}
+	for k, v := range dcConfig.ExposedPorts {
+		cnrConfig.ExposedPorts[string(k)] = v
+	}
+	return cnrConfig
 }

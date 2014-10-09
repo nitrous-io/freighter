@@ -178,6 +178,7 @@ func (s *Server) drawRoutes() {
 	s.secretRoute("/containers", s.createContainer, "POST")
 	s.secretRoute("/containers/{id}", s.getContainerInfo, "GET")
 	s.secretRoute("/containers/{id}", s.terminateContainer, "DELETE")
+	s.secretRoute("/containers/{id}/config", s.getContainerConfig, "GET")
 	s.secretRoute("/containers/{id}/commit", s.commitContainer, "POST")
 	s.secretRoute("/containers/{id}/start", s.startContainer, "POST")
 	s.secretRoute("/containers/{id}/stop", s.stopContainer, "POST")

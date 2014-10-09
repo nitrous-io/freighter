@@ -29,6 +29,12 @@ type MockProvider struct {
 	RestartCalled bool
 	RestartError  error
 
+	GetConfigCalled   bool
+	GetConfigCfg      *provider.DockerConfig
+	GetConfigHostCfg  *provider.DockerHostConfig
+	GetConfigImageCfg *provider.DockerConfig
+	GetConfigError    error
+
 	ReconfigCalled        bool
 	ReconfigContainerInfo *provider.ContainerInfo
 	ReconfigError         error
@@ -223,6 +229,11 @@ func (p *MockProvider) Terminate(id string, removeSettings bool) (*provider.Cont
 	p.TerminateCalled = true
 	p.ReceivedID = id
 	return info, p.TerminateError
+}
+
+func (p *MockProvider) GetConfig(id string) (cnrConfig *provider.DockerConfig, cnrHostConfig *provider.DockerHostConfig, imgConfig *provider.DockerConfig, err error) {
+	p.GetConfigCalled = true
+	return p.GetConfigCfg, p.GetConfigHostCfg, p.GetConfigImageCfg, p.GetConfigError
 }
 
 func (p *MockProvider) Reconfig(id, config string) (*provider.ContainerInfo, error) {
