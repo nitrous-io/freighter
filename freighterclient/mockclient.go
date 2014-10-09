@@ -113,9 +113,10 @@ type MockClient struct {
 	TagImageForce  bool
 	TagImageError  error
 
-	InspectImageCalled int
-	InspectImageReturn *Image
-	InspectImageError  error
+	InspectImageCalled        int
+	InspectImageReceivedImage string
+	InspectImageReturn        *Image
+	InspectImageError         error
 
 	OutputStream io.Reader
 }
@@ -325,5 +326,6 @@ func (c *MockClient) TagImage(slug, newName string, force bool) error {
 
 func (c *MockClient) InspectImage(name string) (*Image, error) {
 	c.InspectImageCalled++
+	c.InspectImageReceivedImage = name
 	return c.InspectImageReturn, c.InspectImageError
 }

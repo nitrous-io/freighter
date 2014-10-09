@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -35,6 +36,8 @@ var (
 
 const defaultDockerGateway = "172.17.42.1"
 const nitrousImageEnv = "NITROUS_IMAGE_VERSION"
+const defaultDockerRegistry = "index.docker.io"
+const dockerRegistryImageEndpoint = "registry-1.docker.io"
 
 func init() {
 	if host := os.Getenv("DOCKER_HOST"); host != "" {
@@ -750,12 +753,26 @@ func (p *DockerProvider) TagImage(imageIDOrName, newName string, force bool) err
 
 // InspectImage returns information about a single image ( which can be
 // identified by either its ID or its tag )
-func (p *DockerProvider) InspectImage(name string) (*provider.ImageInfo, error) {
+func (p *DockerProvider) InspectImage(name string, remoteFallback bool) (*provider.ImageInfo, error) {
 	lookupResult, err := p.lookupImage(name)
+
+	var image *provider.ImageInfo
+	if err == provider.ErrImageNotFound && remoteFallback {
+		return p.inspectRemoteImage(name)
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	return lookupResult.image, nil
+
+	image = lookupResult.image
+	additional, err := p.inspectLocalImage(image.ID)
+	if err != nil {
+		return nil, err
+	}
+	image.Config = additional.Config
+
+	return image, nil
 }
 
 func (p *DockerProvider) AttachToContainer(id string, in io.Reader, out io.Writer, noStdin bool) error {
@@ -882,6 +899,158 @@ func (p *DockerProvider) lookupImage(imageIDOrName string) (lookupImageResult, e
 	return lookupImageResult{}, provider.ErrImageNotFound
 }
 
+func (p *DockerProvider) inspectLocalImage(location string) (*provider.ImageInfo, error) {
+	img, err := p.client.InspectImage(location)
+	if err == dockerclient.ErrNoSuchImage {
+		return nil, provider.ErrImageNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	config := buildDockerConfig(img.Config, img.ID)
+	info := &provider.ImageInfo{
+		ID:         img.ID,
+		CreatedAt:  img.Created.Unix(),
+		ActualSize: img.Size,
+		Config:     config,
+	}
+	return info, nil
+}
+
+func (p *DockerProvider) inspectRemoteImage(location string) (*provider.ImageInfo, error) {
+	registry := parsers.ParseRegistry(location)
+	auth, err := p.fetchAuthenticationInfoBestMatch(registry)
+	if err != nil {
+		return nil, err
+	}
+
+	if registry == "" {
+		registry = defaultDockerRegistry
+	}
+
+	repo, tag := parsers.ParseRepoAndTag(location)
+	repo = strings.Replace(repo, registry+"/", "", 1)
+	if tag == "" {
+		tag = "latest"
+	}
+
+	initReqLoc := fmt.Sprintf("https://%s/v1/repositories/%s/images", registry, repo)
+	resp, err := p.performRegistryRequest(initReqLoc, auth, "")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	dockerSignature := resp.Header.Get("X-Docker-Token")
+
+	var idList []struct {
+		Checksum string `json:"checksum"`
+		Id       string `json:"id"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&idList)
+	if err != nil {
+		return nil, err
+	}
+
+	tagListLoc := fmt.Sprintf("https://%s/v1/repositories/%s/tags", registry, repo)
+	resp, err = p.performRegistryRequest(tagListLoc, auth, "")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var tagList []struct {
+		Layer string `json:"layer"`
+		Name  string `json:"name"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&tagList)
+	if err != nil {
+		return nil, err
+	}
+
+	var expectedId string
+	for _, tagItem := range tagList {
+		if tag != tagItem.Name {
+			continue
+		}
+		for _, idItem := range idList {
+			if strings.HasPrefix(idItem.Id, tagItem.Layer) {
+				expectedId = idItem.Id
+			}
+		}
+	}
+
+	if expectedId == "" {
+		return nil, provider.ErrImageNotFound
+	}
+
+	imageInspectHost := registry
+	if registry == defaultDockerRegistry {
+		imageInspectHost = dockerRegistryImageEndpoint
+	}
+
+	imageInfoLoc := fmt.Sprintf("https://%s/v1/images/%s/json", imageInspectHost, expectedId)
+	resp, err = p.performRegistryRequest(imageInfoLoc, dockerclient.AuthConfiguration{}, dockerSignature)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var imageInfo dockerclient.ImagePre012
+	err = json.NewDecoder(resp.Body).Decode(&imageInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	imageConfig := buildDockerConfig(imageInfo.Config, imageInfo.ID)
+	info := &provider.ImageInfo{
+		ID:         imageInfo.ID,
+		Name:       repo,
+		Tag:        tag,
+		CreatedAt:  imageInfo.Created.Unix(),
+		ActualSize: imageInfo.Size,
+		Config:     imageConfig,
+	}
+
+	return info, nil
+}
+
+func (p *DockerProvider) performRegistryRequest(url string, auth dockerclient.AuthConfiguration, signature string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-Docker-Token", "true")
+	req.Header.Set("Accept", "application/json")
+	if auth.Username != "" {
+		authDetails := fmt.Sprintf("%s:%s", auth.Username, auth.Password)
+		req.Header.Set("Authorization", base64.StdEncoding.EncodeToString([]byte(authDetails)))
+	}
+
+	if signature != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Token %v", signature))
+	}
+
+	cl := p.client
+	resp, err := cl.HTTPClient.Do(req)
+	if err != nil {
+		return resp, err
+	}
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return resp, provider.ErrImageNotFound
+	case http.StatusUnauthorized:
+		return resp, provider.ErrImageAuthNotAllowed
+	default:
+		body, err := ioutil.ReadAll(resp.Body)
+		bodyStr := ""
+		if err == nil {
+			bodyStr = string(body)
+		}
+		return resp, errors.New(fmt.Sprintf("Unknown error: (%d) %s", resp.StatusCode, bodyStr))
+	}
+
+	return resp, err
+}
+
 func (p *DockerProvider) ContainerSettingsDir(containerName string) string {
 	return path.Join(p.dataPath, "containers", containerName)
 }
@@ -987,6 +1156,27 @@ func (p *DockerProvider) isNitrousImage(fullName string) bool {
 		}
 	}
 	return false
+}
+
+func buildDockerConfig(config *dockerclient.Config, imageId string) *provider.DockerConfig {
+	if config == nil {
+		return nil
+	}
+
+	imageConfig := &provider.DockerConfig{
+		Env:          config.Env,
+		Cmd:          config.Cmd,
+		Volumes:      config.Volumes,
+		PortSpecs:    config.PortSpecs,
+		ExposedPorts: make(map[string]struct{}),
+		Image:        imageId,
+	}
+
+	for port, str := range config.ExposedPorts {
+		imageConfig.ExposedPorts[string(port)] = str
+	}
+
+	return imageConfig
 }
 
 func nameFromContainer(container *dockerclient.Container) string {

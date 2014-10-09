@@ -33,7 +33,7 @@ var hostnameRe = regexp.MustCompile(`\A[^.]+\.[^.:]+(:[0-9]+)?\z`)
 //    example.com/ubuntu:14.04 -> "example.com"
 //    example.com:5000/ubuntu:14.04 -> "example.com:5000"
 //    example.com:5000/nitrousio/ubuntu:14.04 -> "example.com:5000"
-func ParseRegistry(repos string) string {
+var ParseRegistry = func(repos string) string {
 	parts := strings.Split(repos, "/")
 	switch len(parts) {
 	case 2:

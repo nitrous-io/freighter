@@ -25,6 +25,10 @@ func (p *DockerProvider) IsNitrousImage(fullName string) bool {
 	return p.isNitrousImage(fullName)
 }
 
+func (p *DockerProvider) InspectRemoteImage(location string) (*provider.ImageInfo, error) {
+	return p.inspectRemoteImage(location)
+}
+
 // Specify another docker host instead of the default unix socket
 // This is useful when we want to inject a fake docker host or when we want to
 // use FakeRoundtripper with a dummy tcp address

@@ -11,6 +11,7 @@ import (
 
 	"github.com/nitrous-io/freighter/freighterclient"
 	"github.com/nitrous-io/freighter/provider"
+	"github.com/nitrous-io/freighter/test"
 	"github.com/onsi/gomega/ghttp"
 
 	. "github.com/onsi/ginkgo"
@@ -44,7 +45,7 @@ func (st *ServerTest) Setup() (*ServerTest, error) {
 		return nil, err
 	}
 
-	host := freighterclient.NewHost(ip, port, "example.com", localhostCert)
+	host := freighterclient.NewHost(ip, port, "example.com", test.GoLocalhostCert)
 	client, err := freighterclient.NewClientTransport(host, "mysecret", st.tp)
 
 	if err != nil {
@@ -1808,7 +1809,10 @@ var _ = Describe("client", func() {
 					"tag": "tag",
 					"created_at": 1902,
 					"actual_size": 12,
-					"virtual_size": 39
+					"virtual_size": 39,
+					"config": {
+						"env":["PATH=/sbin","SHELLSHOCK=maybe"]
+					}
 				}
 			}`
 			handlers := ghttp.CombineHandlers(
@@ -1821,6 +1825,7 @@ var _ = Describe("client", func() {
 
 			image, err := cl.InspectImage("myimage:tag")
 			Expect(err).To(BeNil(), "failed to inspect image")
+			conf := &freighterclient.DockerConfig{Env: []string{"PATH=/sbin", "SHELLSHOCK=maybe"}}
 			Expect(image).To(Equal(&freighterclient.Image{
 				ID:          "12",
 				Name:        "myimage",
@@ -1828,11 +1833,13 @@ var _ = Describe("client", func() {
 				CreatedAt:   1902,
 				ActualSize:  12,
 				VirtualSize: 39,
+				Config:      conf,
 			}))
 
 			reqs := server.ReceivedRequests()
 			Expect(reqs).To(HaveLen(1))
 			Expect(reqs[0].FormValue("image")).To(Equal("myimage:tag"), "failed to inspect correct image")
+			Expect(reqs[0].FormValue("remote")).To(Equal("true"), "expect remote to be included")
 		})
 
 		It("returns error when json is malformed", func() {
@@ -2261,34 +2268,3 @@ var _ = Describe("client", func() {
 		})
 	})
 })
-
-// These certs are the same as the certs embeded with net/http/httptest.
-// If there's mismatched certs error, look at net/http/httptest/server.go to
-// check if the cert has changed.
-//
-// localhostCert is a PEM-encoded TLS cert with SAN IPs
-// "127.0.0.1" and "[::1]", expiring at the last second of 2049 (the end
-// of ASN.1 time).
-// generated from src/pkg/crypto/tls:
-// go run generate_cert.go  --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
-var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
-MIIBdzCCASOgAwIBAgIBADALBgkqhkiG9w0BAQUwEjEQMA4GA1UEChMHQWNtZSBD
-bzAeFw03MDAxMDEwMDAwMDBaFw00OTEyMzEyMzU5NTlaMBIxEDAOBgNVBAoTB0Fj
-bWUgQ28wWjALBgkqhkiG9w0BAQEDSwAwSAJBAN55NcYKZeInyTuhcCwFMhDHCmwa
-IUSdtXdcbItRB/yfXGBhiex00IaLXQnSU+QZPRZWYqeTEbFSgihqi1PUDy8CAwEA
-AaNoMGYwDgYDVR0PAQH/BAQDAgCkMBMGA1UdJQQMMAoGCCsGAQUFBwMBMA8GA1Ud
-EwEB/wQFMAMBAf8wLgYDVR0RBCcwJYILZXhhbXBsZS5jb22HBH8AAAGHEAAAAAAA
-AAAAAAAAAAAAAAEwCwYJKoZIhvcNAQEFA0EAAoQn/ytgqpiLcZu9XKbCJsJcvkgk
-Se6AbGXgSlq+ZCEVo0qIwSgeBqmsJxUu7NCSOwVJLYNEBO2DtIxoYVk+MA==
------END CERTIFICATE-----`)
-
-// localhostKey is the private key for localhostCert.
-var localhostKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
-MIIBPAIBAAJBAN55NcYKZeInyTuhcCwFMhDHCmwaIUSdtXdcbItRB/yfXGBhiex0
-0IaLXQnSU+QZPRZWYqeTEbFSgihqi1PUDy8CAwEAAQJBAQdUx66rfh8sYsgfdcvV
-NoafYpnEcB5s4m/vSVe6SU7dCK6eYec9f9wpT353ljhDUHq3EbmE4foNzJngh35d
-AekCIQDhRQG5Li0Wj8TM4obOnnXUXf1jRv0UkzE9AHWLG5q3AwIhAPzSjpYUDjVW
-MCUXgckTpKCuGwbJk7424Nb8bLzf3kllAiA5mUBgjfr/WtFSJdWcPQ4Zt9KTMNKD
-EUO0ukpTwEIl6wIhAMbGqZK3zAAFdq8DD2jPx+UJXnh0rnOkZBzDtJ6/iN69AiEA
-1Aq8MJgTaYsDQWyU/hDq5YkDJc9e9DSCvUIzqxQWMQE=
------END RSA PRIVATE KEY-----`)

@@ -46,6 +46,7 @@ var (
 	ErrImageExists             = provider.ErrImageExists
 	ErrImageInUse              = provider.ErrImageInUse
 	ErrImagePushAuthRequired   = provider.ErrImagePushAuthRequired
+	ErrImageAuthNotAllowed     = provider.ErrImageAuthNotAllowed
 
 	// ErrInvalidSecret is returned when freighterclient caller passed in an
 	// empty/invalid secret
@@ -139,7 +140,16 @@ type (
 		PortBindings    map[string][]PortBinding `json:"port_bindings,omitempty"`
 		PublishAllPorts bool                     `json:"publish_all_ports,omitempty"`
 	}
-	Image    provider.ImageInfo
+	// same duplication
+	Image struct {
+		ID          string        `json:"id"`
+		Name        string        `json:"name"`
+		Tag         string        `json:"tag"`
+		CreatedAt   int64         `json:"created_at"`
+		ActualSize  int64         `json:"actual_size"`
+		VirtualSize int64         `json:"virtual_size"`
+		Config      *DockerConfig `json:"config"`
+	}
 	Volume   provider.VolumeInfo
 	HostInfo Stats
 
@@ -991,7 +1001,8 @@ func (c *client) TagImage(image, tag string, force bool) error {
 
 func (c *client) InspectImage(image string) (*Image, error) {
 	data := &url.Values{
-		"image": []string{image},
+		"image":  []string{image},
+		"remote": []string{"true"},
 	}
 	u := fmt.Sprintf("%s/images/inspect?%s", c.host.BaseURL(), data.Encode())
 	req, err := http.NewRequest("GET", u, nil)
