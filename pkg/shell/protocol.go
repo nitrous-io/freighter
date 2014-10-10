@@ -4,7 +4,8 @@
 // <-- d|whoami          # input from client
 // --> d|action          # output from server
 // <-- r|80 25           # resize from client
-// <-- c|good bye        # close msg
+// <-- c|good bye        # close msg from client
+// --> c|                # close msg from server
 //
 // NOT IMPLEMENTED
 // <-- h                  # heartbeat from client
@@ -156,12 +157,15 @@ func (s *ShellReader) Read(p []byte) (int, error) {
 	return 0, nil
 }
 
-// ShellWriter handles server write which outputs d|server_output
+// ShellWriter takes data written to it and writes it as a data message of the
+// form "d|server_output". It writes server output to be sent to the client.
 type ShellWriter struct {
 	writer io.Writer
 }
 
-func NewShellWriter(w io.Writer) io.Writer {
+// NewShellWriter creates a new ShellWriter that satisfies io.WriteCloser.
+// It is the caller's responsibility to call Close on the WriteCloser when done.
+func NewShellWriter(w io.Writer) *ShellWriter {
 	return &ShellWriter{writer: w}
 }
 
@@ -172,4 +176,11 @@ func (s *ShellWriter) Write(p []byte) (int, error) {
 	copy(buf[2:], p)
 	_, err := s.writer.Write(buf)
 	return l, err
+}
+
+// Close sends a close message to the client, but does not close the underlying
+// io.Writer.
+func (s *ShellWriter) Close() error {
+	_, err := s.writer.Write(closeMsg)
+	return err
 }
