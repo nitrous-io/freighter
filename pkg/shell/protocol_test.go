@@ -100,3 +100,14 @@ func TestNewShellWriter(t *testing.T) {
 		}
 	}
 }
+
+func TestShellWriterClose(t *testing.T) {
+	w := bytes.NewBuffer(nil)
+	s := NewShellWriter(w)
+
+	s.Close()
+
+	if w.String() != `c|` {
+		t.Errorf("expect close message to be written but got %s", w.String())
+	}
+}
