@@ -403,6 +403,7 @@ func (s *Server) wsNewShell(w http.ResponseWriter, r *http.Request) error {
 	for {
 		select {
 		case <-ch:
+			stdout.Close() // Inform client that server has closed connection.
 			return nil
 		case msg := <-msgCh:
 			switch msg := msg.(type) {
