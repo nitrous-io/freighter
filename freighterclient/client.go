@@ -145,7 +145,7 @@ type (
 
 	containerResponse struct {
 		*Container   `json:"container"`
-		Result       string `json:"result,omitempty"`
+		Status       string `json:"status,omitempty"`
 		ErrorMessage string `json:"error,omitempty"`
 	}
 
@@ -330,7 +330,7 @@ func (c *client) Create(name, image, secret string, config *ContainerConfig) (*C
 		return nil, err
 	}
 	// Check whether there is an error starting the container.
-	if containerResp.Result == "start_failed" {
+	if containerResp.Status == "start_failed" {
 		return containerResp.Container, &StartFailedError{Msg: containerResp.ErrorMessage}
 	}
 

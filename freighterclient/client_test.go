@@ -358,7 +358,7 @@ var _ = Describe("client", func() {
 			Context("when the response has a result of start_failed", func() {
 				BeforeEach(func() {
 					responseBody = `{
-						"result": "start_failed",
+						"status": "start_failed",
 						"error": "start failed: could not bind port 22",
 						"container": {
 							"id":"cafebabe",
