@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path"
 	"strings"
-	"text/template"
 	"time"
 
 	dockerclient "github.com/fsouza/go-dockerclient"
@@ -22,9 +21,8 @@ import (
 )
 
 var (
-	dockerfileUbuntu = template.Must(template.New("ubuntu").Parse(dockerfileUbuntuTmpl))
-	dockerHost       = "unix:///var/run/docker.sock"
-	registryName     = "nitrousio"
+	dockerHost   = "unix:///var/run/docker.sock"
+	registryName = "nitrousio"
 
 	// list of images 'blessed' by Nitrous. If tag is included, the specific
 	// tag is checked for, otherwise any tag is allowed
