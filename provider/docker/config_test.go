@@ -258,13 +258,30 @@ var _ = Describe("provider/docker config", func() {
 			})
 		})
 
+		It("sets Privileged to the value of ContainerConfig.Privileged", func() {
+			cnCfg := &provider.ContainerConfig{
+				Hostname:   cnrName,
+				Image:      "not/nitrous",
+				Privileged: false,
+			}
+
+			hostCfg, err := prov.MkHostConfig(oldHostCfg, cnCfg, true)
+			Expect(err).To(BeNil())
+			Expect(hostCfg.Privileged).To(BeFalse())
+
+			cnCfg.Privileged = true
+			hostCfg, err = prov.MkHostConfig(oldHostCfg, cnCfg, true)
+			Expect(err).To(BeNil())
+			Expect(hostCfg.Privileged).To(BeTrue())
+		})
+
 		Context("with PublishAll config", func() {
 			BeforeEach(func() {
 				var err error
 				hostCfg, err = prov.MkHostConfig(oldHostCfg,
 					&provider.ContainerConfig{
 						Hostname:   cnrName,
-						Image:      "nitrousio/php", // Nitrous image.
+						Image:      "not/nitrous",
 						PublishAll: true,
 					}, true)
 				Expect(err).To(BeNil())
@@ -273,7 +290,6 @@ var _ = Describe("provider/docker config", func() {
 			It("sets PublishAllPorts to true", func() {
 				Expect(hostCfg.PublishAllPorts).To(BeTrue())
 			})
-
 		})
 	})
 })

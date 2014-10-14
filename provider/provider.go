@@ -112,6 +112,7 @@ type ContainerInfo struct {
 type ContainerConfig struct {
 	Hostname     string   `json:"-"`
 	Image        string   `json:"-"`
+	Privileged   bool     `json:"Privileged"`
 	Cmd          []string `json:"Cmd"`
 	Env          []string `json:"Env"`
 	Mounts       []string `json:"Mounts"`

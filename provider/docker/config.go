@@ -63,6 +63,8 @@ func (p *DockerProvider) mkHostConfig(hostCfg *dockerclient.HostConfig, cfg *pro
 	if cfg == nil {
 		return &newCfg, nil
 	}
+
+	newCfg.Privileged = cfg.Privileged
 	newCfg.PublishAllPorts = cfg.PublishAll
 	if cfg.PortBindings != nil {
 		bs, err := dockerPortBindings(cfg.PortBindings)
