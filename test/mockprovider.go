@@ -128,9 +128,10 @@ type MockProvider struct {
 	ReceivedTag      string
 	ReceivedTagForce bool
 
-	InspectImageCalled bool
-	InspectImageReturn *provider.ImageInfo
-	InspectImageError  error
+	InspectImageCalled         bool
+	InspectImageRemoteFallback bool
+	InspectImageReturn         *provider.ImageInfo
+	InspectImageError          error
 
 	AttachToContainerCalled  bool
 	AttachToContainerError   error
@@ -352,8 +353,9 @@ func (p *MockProvider) TagImage(name, tag string, force bool) error {
 	return p.TagImageError
 }
 
-func (p *MockProvider) InspectImage(name string) (*provider.ImageInfo, error) {
+func (p *MockProvider) InspectImage(name string, remoteFallback bool) (*provider.ImageInfo, error) {
 	p.InspectImageCalled = true
+	p.InspectImageRemoteFallback = remoteFallback
 	return p.InspectImageReturn, p.InspectImageError
 }
 

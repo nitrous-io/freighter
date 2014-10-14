@@ -328,6 +328,10 @@ var _ = Describe("server", func() {
 		})
 
 		It("responds with 200 OK when successful", func() {
+			conf := &provider.DockerConfig{
+				Env: []string{"PATH=/dev/null", "NITROUS_IMAGE_VERSION=1.0"},
+				Cmd: []string{"/bin/sh", "-c", "/bin/bash"},
+			}
 			prov.CommitInfo = &provider.ImageInfo{
 				ID:          "ID1",
 				Name:        "pipped",
@@ -335,12 +339,14 @@ var _ = Describe("server", func() {
 				CreatedAt:   1975,
 				ActualSize:  12,
 				VirtualSize: 19,
+				Config:      conf,
 			}
 			doRequest("python", "pipped")
 			Expect(res.Code).To(Equal(http.StatusOK))
 			Expect(prov.CommitCalled).To(BeTrue())
 			Expect(res.Body.String()).To(MatchJSON(`{"image":{
-				"id":"ID1","name":"pipped","tag":"latest","created_at":1975,"actual_size":12,"virtual_size":19}}`))
+				"id":"ID1","name":"pipped","tag":"latest","created_at":1975,"actual_size":12,"virtual_size":19,
+				"config":{"env":["PATH=/dev/null", "NITROUS_IMAGE_VERSION=1.0"],"cmd":["/bin/sh", "-c", "/bin/bash"]}}}`))
 		})
 
 		Context("when container commit fails", func() {
@@ -1412,8 +1418,10 @@ var _ = Describe("server", func() {
 	})
 
 	Describe("GET /images/inspect", func() {
-		doRequest := func(image string) *httptest.ResponseRecorder {
-			params := &url.Values{}
+		doRequest := func(image string, params *url.Values) *httptest.ResponseRecorder {
+			if params == nil {
+				params = &url.Values{}
+			}
 			params.Set("image", image)
 			req, err := NewRequestWithSecret(hostSecret, "GET", "/images/inspect", params)
 			Expect(err).To(BeNil())
@@ -1426,26 +1434,38 @@ var _ = Describe("server", func() {
 		It("responds with the image info", func() {
 			expected := &provider.ImageInfo{ID: "ID1"}
 			prov.InspectImageReturn = expected
-			res := doRequest("ubuntu")
+			res := doRequest("ubuntu", nil)
 			Expect(res.Code).To(Equal(http.StatusOK), "failed to inspect image")
 
 			returned := map[string]*provider.ImageInfo{}
 			err := json.NewDecoder(res.Body).Decode(&returned)
 			Expect(err).To(BeNil(), "failed to decode response as valid image info")
 			Expect(returned["image"]).To(Equal(expected), "failed to encode valid response")
+
+			Expect(prov.InspectImageRemoteFallback).To(BeTrue())
 		})
 
 		It("responds with 422 Status when the image is empty", func() {
-			res := doRequest("")
+			res := doRequest("", nil)
 			Expect(res.Code).To(Equal(422))
 			Expect(res.Body.String()).To(MatchJSON(`{"error":"image is not valid"}`))
 		})
 
 		It("responds with 500 Internal Server Error when we failed to inspect the image", func() {
 			prov.InspectImageError = errors.New("could not find image")
-			res := doRequest("ubuntu")
+			res := doRequest("ubuntu", nil)
 			Expect(res.Code).To(Equal(http.StatusInternalServerError))
 			Expect(res.Body.String()).To(MatchJSON(`{"error":"could not find image"}`))
+
+			Expect(prov.InspectImageRemoteFallback).To(BeTrue())
+		})
+
+		It("should allow for opting out of remote image", func() {
+			expected := &provider.ImageInfo{ID: "ID1"}
+			prov.InspectImageReturn = expected
+			res := doRequest("ubuntu", &url.Values{"remote": {"false"}})
+			Expect(res.Code).To(Equal(http.StatusOK), "failed to inspect image")
+			Expect(prov.InspectImageRemoteFallback).To(BeFalse())
 		})
 	})
 

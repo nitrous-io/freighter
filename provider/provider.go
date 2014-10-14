@@ -22,7 +22,7 @@ var (
 	ErrImageShared             = errors.New("Image is shared across multiple tags")
 	ErrImageInUse              = errors.New("Image is being used by one or more containers")
 	ErrImageExists             = errors.New("Image with same name and tag already exists")
-	ErrImageAuthNotAllowed     = errors.New("Do not have permission to push/pull image")
+	ErrImageAuthNotAllowed     = errors.New("Do not have permission to access this image")
 	ErrImageAuthMisconfigured  = errors.New("Image registry configuration invalid")
 	ErrImagePushAuthRequired   = errors.New("Log in to the registry before pushing an image to it")
 	ErrTokenVerificationFailed = errors.New("Permission denied")
@@ -68,7 +68,7 @@ type Provider interface {
 	PullImage(repository string, output io.Writer, rawJSONStream bool) error
 	PushImage(name, destination string, output io.Writer, rawJSONStream bool) error
 	TagImage(name, tag string, force bool) error
-	InspectImage(name string) (*ImageInfo, error)
+	InspectImage(name string, remoteFallback bool) (*ImageInfo, error)
 
 	CreateVolume(slug string) (*VolumeInfo, error)
 	ListVolumes() ([]string, error)
@@ -147,12 +147,13 @@ type DockerHostConfig struct {
 }
 
 type ImageInfo struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Tag         string `json:"tag"`
-	CreatedAt   int64  `json:"created_at"`
-	ActualSize  int64  `json:"actual_size"`
-	VirtualSize int64  `json:"virtual_size"`
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Tag         string        `json:"tag"`
+	CreatedAt   int64         `json:"created_at"`
+	ActualSize  int64         `json:"actual_size"`
+	VirtualSize int64         `json:"virtual_size"`
+	Config      *DockerConfig `json:"config"`
 }
 
 type VolumeInfo struct {
