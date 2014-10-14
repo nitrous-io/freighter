@@ -323,20 +323,16 @@ var _ = Describe("provider/docker", func() {
 
 			Describe(".GetConfig()", func() {
 				It("returns container config", func() {
-					cnrConfig, cnrHostConfig, imageCfg, err := prov.GetConfig(id)
+					config, err := prov.GetConfig(id)
 					Expect(err).To(BeNil())
 					// not all config checked against -- elided to avoid test
 					// fragility wrt image changes
-					Expect(cnrConfig).NotTo(BeNil())
-					Expect(cnrConfig.Env).To(ContainElement("__HOST=172.17.42.1"))
-					Expect(cnrConfig.ExposedPorts).To(HaveKey("22/tcp"))
-					Expect(cnrHostConfig).NotTo(BeNil())
-					Expect(cnrHostConfig.Binds).To(HaveLen(1))
-					Expect(strings.HasSuffix(cnrHostConfig.Binds[0], ":/nitrous/ssh:ro")).To(BeTrue()) // FIXME newer Gomega has HaveSuffix
-					Expect(cnrHostConfig.PublishAllPorts).To(BeTrue())
-					Expect(imageCfg).NotTo(BeNil())
-					Expect(imageCfg.Env).To(ContainElement("NITROUS_USERNAME=action"))
-					Expect(imageCfg.ExposedPorts).To(HaveKey("22/tcp"))
+					Expect(config).NotTo(BeNil())
+					Expect(config.Env).To(ContainElement("__HOST=172.17.42.1"))
+					Expect(config.Mounts).To(HaveLen(1))
+					Expect(strings.HasSuffix(config.Mounts[0], "/nitrous/ssh:ro")).To(BeTrue())
+					Expect(config.Privileged).NotTo(BeTrue())
+					Expect(config.PublishAll).To(BeTrue())
 				})
 			})
 

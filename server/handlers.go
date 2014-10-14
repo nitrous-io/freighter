@@ -152,16 +152,14 @@ func (s *Server) getContainerInfo(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getContainerConfig(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	cnrConfig, cnrHostConfig, imgConfig, err := s.provider.GetConfig(id)
+	config, err := s.provider.GetConfig(id)
 	if err != nil {
 		s.handleError(w, err)
 		return
 	}
 
 	s.respondEncodeJSON(w, http.StatusOK, map[string]interface{}{
-		"config":       cnrConfig,
-		"host_config":  cnrHostConfig,
-		"image_config": imgConfig,
+		"config": config,
 	})
 }
 

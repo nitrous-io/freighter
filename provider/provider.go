@@ -41,7 +41,7 @@ type Provider interface {
 	CreateStart(name, image, secret, config string) (info *ContainerInfo, err error)
 	Commit(id, imageName string) (info *ImageInfo, err error)
 	GetInfo(id string) (info *ContainerInfo, err error)
-	GetConfig(id string) (cnrConfig *DockerConfig, cnrHostConfig *DockerHostConfig, imgConfig *DockerConfig, err error)
+	GetConfig(id string) (config *ContainerConfig, err error)
 	Start(id, config string) (info *ContainerInfo, err error)
 	Stop(id string) (info *ContainerInfo, err error)
 	Restart(id string) (info *ContainerInfo, err error)
