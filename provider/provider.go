@@ -137,15 +137,6 @@ type PortBinding struct {
 	HostPort string `json:"host_port,omitempty"`
 }
 
-// DockerConfig is fields we care about from the container's HostConfig on
-// Docker; it is a subset of dockerclient.HostConfig .  Note: json keys are
-// lowercased instead of camel-cased.
-type DockerHostConfig struct {
-	Binds           []string                 `json:"binds,omitempty"`
-	PortBindings    map[string][]PortBinding `json:"port_bindings,omitempty"`
-	PublishAllPorts bool                     `json:"publish_all_ports,omitempty"`
-}
-
 type ImageInfo struct {
 	ID          string        `json:"id"`
 	Name        string        `json:"name"`

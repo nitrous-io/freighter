@@ -134,13 +134,7 @@ type (
 	ContainerConfig provider.ContainerConfig
 	DockerConfig    provider.DockerConfig
 	PortBinding     provider.PortBinding
-	// duplication but needed to get freighterclient.PortBinding instead of provider.PortBinding
-	DockerHostConfig struct {
-		Binds           []string                 `json:"binds,omitempty"`
-		PortBindings    map[string][]PortBinding `json:"port_bindings,omitempty"`
-		PublishAllPorts bool                     `json:"publish_all_ports,omitempty"`
-	}
-	// same duplication
+	// duplication but needed to get freighterclient.DockerConfig instead of provider.DockerConfig
 	Image struct {
 		ID          string        `json:"id"`
 		Name        string        `json:"name"`
