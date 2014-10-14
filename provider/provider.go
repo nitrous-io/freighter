@@ -112,12 +112,12 @@ type ContainerInfo struct {
 type ContainerConfig struct {
 	Hostname     string   `json:"-"`
 	Image        string   `json:"-"`
-	Privileged   bool     `json:"Privileged"`
-	Cmd          []string `json:"Cmd"`
-	Env          []string `json:"Env"`
-	Mounts       []string `json:"Mounts"`
-	PortBindings []string `json:"PortBindings"`
-	PublishAll   bool     `json:"PublishAll"`
+	Privileged   bool     `json:"Privileged,omitempty"`
+	Cmd          []string `json:"Cmd,omitempty"`
+	Env          []string `json:"Env,omitempty"`
+	Mounts       []string `json:"Mounts,omitempty"`
+	PortBindings []string `json:"PortBindings,omitempty"`
+	PublishAll   bool     `json:"PublishAll,omitempty"`
 }
 
 // DockerConfig is fields we care about from the container's Config on Docker;

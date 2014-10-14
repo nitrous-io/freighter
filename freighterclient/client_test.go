@@ -334,8 +334,7 @@ var _ = Describe("client", func() {
 					Expect(receivedRequests[0].PostFormValue("name")).To(Equal("yosemite"))
 					Expect(receivedRequests[0].PostFormValue("image")).To(Equal("ubuntu"))
 					Expect(receivedRequests[0].PostFormValue("secret")).To(Equal("s3cr3t"))
-					Expect(receivedRequests[0].PostFormValue("config")).To(Equal(
-						`{"Cmd":null,"Env":["LANG=C"],"Mounts":null,"PortBindings":null,"PublishAll":false}`))
+					Expect(receivedRequests[0].PostFormValue("config")).To(MatchJSON(`{"Env":["LANG=C"]}`))
 
 					Expect(container).To(Equal(&freighterclient.Container{
 						ID:         "cafebabe",
@@ -393,8 +392,7 @@ var _ = Describe("client", func() {
 					Expect(reqs[0].PostFormValue("name")).To(Equal("yosemite"))
 					Expect(reqs[0].PostFormValue("image")).To(Equal("ubuntu"))
 					Expect(reqs[0].PostFormValue("secret")).To(Equal("s3cr3t"))
-					Expect(reqs[0].PostFormValue("config")).To(Equal(
-						`{"Cmd":null,"Env":["LANG=C"],"Mounts":null,"PortBindings":null,"PublishAll":false}`))
+					Expect(reqs[0].PostFormValue("config")).To(MatchJSON(`{"Env":["LANG=C"]}`))
 
 					Expect(container).To(Equal(&freighterclient.Container{
 						ID:         "cafebabe",
@@ -813,8 +811,7 @@ var _ = Describe("client", func() {
 
 			reqs := server.ReceivedRequests()
 			Expect(reqs).To(HaveLen(1))
-			Expect(reqs[0].PostFormValue("config")).To(Equal(
-				`{"Cmd":null,"Env":["LANG=C"],"Mounts":null,"PortBindings":null,"PublishAll":false}`))
+			Expect(reqs[0].PostFormValue("config")).To(MatchJSON(`{"Env":["LANG=C"]}`))
 		})
 
 		Context("when the response is empty", func() {
