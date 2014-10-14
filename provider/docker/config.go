@@ -15,6 +15,24 @@ var (
 	ErrInvalidMountSpec = fmt.Errorf("volume specification invalid")
 )
 
+// configFromContainer populates a ContainerConfig given a container
+func (p *DockerProvider) configFromContainer(cnr *dockerclient.Container) *provider.ContainerConfig {
+	config := &provider.ContainerConfig{
+		Privileged: cnr.HostConfig.Privileged,
+		Cmd:        cnr.Config.Cmd,
+		Env:        cnr.Config.Env,
+		PublishAll: cnr.HostConfig.PublishAllPorts,
+		Mounts:     mountBindsFromDocker(cnr.HostConfig.Binds, p.VolumesDir("")),
+	}
+	portsSource := cnr.HostConfig.PortBindings
+	if cnr.State.Running {
+		portsSource = cnr.NetworkSettings.Ports
+	}
+	config.PortBindings = portBindingsFromDocker(portsSource)
+
+	return config
+}
+
 func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig, isTrustedImage bool) (*dockerclient.Config, error) {
 	dcConfig := &dockerclient.Config{
 		Hostname:     cfg.Hostname,
@@ -27,7 +45,7 @@ func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig, isTrus
 	}
 
 	dcConfig.Env = cfg.Env
-	bs, err := dockerPortBindings(cfg.PortBindings)
+	bs, err := portBindingsToDocker(cfg.PortBindings)
 	if err != nil {
 		return nil, err
 	}
@@ -67,14 +85,14 @@ func (p *DockerProvider) mkHostConfig(hostCfg *dockerclient.HostConfig, cfg *pro
 	newCfg.Privileged = cfg.Privileged
 	newCfg.PublishAllPorts = cfg.PublishAll
 	if cfg.PortBindings != nil {
-		bs, err := dockerPortBindings(cfg.PortBindings)
+		bs, err := portBindingsToDocker(cfg.PortBindings)
 		if err != nil {
 			return nil, err
 		}
 		newCfg.PortBindings = bs
 	}
 	if cfg.Mounts != nil {
-		ms, err := dockerMountBinds(cfg.Mounts, p.VolumesDir(""))
+		ms, err := mountBindsToDocker(cfg.Mounts, p.VolumesDir(""))
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +117,7 @@ func (p *DockerProvider) mkHostConfig(hostCfg *dockerclient.HostConfig, cfg *pro
 	return &newCfg, nil
 }
 
-func dockerMountBinds(mountSpecs []string, hostVolsPath string) ([]string, error) {
+func mountBindsToDocker(mountSpecs []string, hostVolsPath string) ([]string, error) {
 	binds := []string{}
 	for _, mspec := range mountSpecs {
 		// TODO do we want to validate host volume existence at this point?
@@ -112,9 +130,38 @@ func dockerMountBinds(mountSpecs []string, hostVolsPath string) ([]string, error
 	return binds, nil
 }
 
+func mountBindsFromDocker(dockerSpecs []string, hostVolsPath string) []string {
+	binds := []string{}
+	for _, spec := range dockerSpecs {
+		parts := strings.Split(spec, ":")
+		if len(parts) == 3 { // hostPath:containerPath:ro style spec
+			binds = append(binds, spec)
+			continue
+		}
+		if len(parts) != 2 {
+			continue
+		}
+
+		if !strings.HasPrefix(parts[0], hostVolsPath) { // non-nitrous style spec
+			binds = append(binds, spec)
+			continue
+		}
+
+		// nitrous volume handling
+		slug := filepath.Base(parts[1])
+		if parts[0] == filepath.Join(hostVolsPath, slug) && parts[1] == filepath.Join("/volumes", slug) {
+			binds = append(binds, slug) // volumeSlug spec
+			continue
+		}
+		binds = append(binds, fmt.Sprintf("%s:%s", slug, parts[1])) // volumeSlug:mountPoint spec
+	}
+	return binds
+}
+
 // parseMountSpec supports any of:
 //   volumeSlug:mountPoint
 //   volumeSlug
+//   hostPath:containerPath:ro
 // It appends the appropriate host path to the volume slug.  No validations on
 // mountPoint are performed -- let docker handle.  If mountPoint is missing,
 // mount to /volumes/<volumeSlug>
@@ -126,13 +173,15 @@ func parseMountSpec(mspec string, hostVolsPath string) (string, error) {
 		mountPoint = fmt.Sprintf("/volumes/%s", parts[0])
 	case 2:
 		mountPoint = parts[1]
+	case 3:
+		return mspec, nil
 	default:
 		return "", ErrInvalidMountSpec
 	}
 	return fmt.Sprintf("%s:%s", filepath.Join(hostVolsPath, parts[0]), mountPoint), nil
 }
 
-func dockerPortBindings(portSpecs []string) (map[dockerclient.Port][]dockerclient.PortBinding, error) {
+func portBindingsToDocker(portSpecs []string) (map[dockerclient.Port][]dockerclient.PortBinding, error) {
 	bindings := map[dockerclient.Port][]dockerclient.PortBinding{}
 	for _, portSpec := range portSpecs {
 		p, pb, err := parsePortSpec(portSpec)
@@ -178,4 +227,29 @@ func parsePortSpec(portSpec string) (dockerclient.Port, dockerclient.PortBinding
 	}
 	return dockerclient.Port(containerPort),
 		dockerclient.PortBinding{HostIp: hostIP, HostPort: hostPort}, nil
+}
+
+// portBindingsFromDocker converts docker portbindings back to
+// provider.ContainerConfig's format. It is almost the inverse of
+// portBindingsToDocker (except that unassigned host ports will be filled in).
+// Which means port specs will only have one of:
+//   public:hostPort:containerPort
+//   private:hostPort:containerPort
+func portBindingsFromDocker(dockerBindings map[dockerclient.Port][]dockerclient.PortBinding) []string {
+	bindings := []string{}
+	for containerPort, portBindings := range dockerBindings {
+		if portBindings == nil {
+			// TODO investigate how else to resolve
+			continue
+		}
+		for _, pb := range portBindings {
+			access := "public"
+			if pb.HostIp == defaultDockerGateway {
+				access = "private"
+			}
+			bindings = append(bindings, fmt.Sprintf("%s:%s:%s", access, pb.HostPort, containerPort))
+		}
+	}
+
+	return bindings
 }
