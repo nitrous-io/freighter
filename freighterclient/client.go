@@ -84,7 +84,7 @@ type Client interface {
 	Stop(id string) (*Container, error)
 	Restart(id string) (*Container, error)
 	Terminate(id string) (*Container, error)
-	Config(id string) (cnrConfig *DockerConfig, cnrHostConfig *DockerHostConfig, imgConfig *DockerConfig, err error)
+	Config(id string) (config *ContainerConfig, err error)
 	Reconfig(id string, config *ContainerConfig) (*Container, error)
 
 	AddPublicKeys(id string, keys []string) error
@@ -134,13 +134,7 @@ type (
 	ContainerConfig provider.ContainerConfig
 	DockerConfig    provider.DockerConfig
 	PortBinding     provider.PortBinding
-	// duplication but needed to get freighterclient.PortBinding instead of provider.PortBinding
-	DockerHostConfig struct {
-		Binds           []string                 `json:"binds,omitempty"`
-		PortBindings    map[string][]PortBinding `json:"port_bindings,omitempty"`
-		PublishAllPorts bool                     `json:"publish_all_ports,omitempty"`
-	}
-	// same duplication
+	// duplication but needed to get freighterclient.DockerConfig instead of provider.DockerConfig
 	Image struct {
 		ID          string        `json:"id"`
 		Name        string        `json:"name"`
@@ -399,17 +393,17 @@ func (c *client) Info(id string) (*Container, error) {
 // Config makes an API Request to a given Freigher Host and returns the Config,
 // HostConfig, and image config for a container with the given id.
 // If the Container does not exist, ErrContainerNotFound is returned.
-func (c *client) Config(id string) (*DockerConfig, *DockerHostConfig, *DockerConfig, error) {
+func (c *client) Config(id string) (*ContainerConfig, error) {
 	u := fmt.Sprintf("%s/containers/%s/config", c.host.BaseURL(), id)
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := performRequest(c, req)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -417,21 +411,19 @@ func (c *client) Config(id string) (*DockerConfig, *DockerHostConfig, *DockerCon
 	case http.StatusOK:
 		// Success, do nothing.
 	case http.StatusNotFound:
-		return nil, nil, nil, ErrContainerNotFound
+		return nil, ErrContainerNotFound
 	default:
-		return nil, nil, nil, statusError(resp)
+		return nil, statusError(resp)
 	}
 
-	confs := struct {
-		Config      *DockerConfig     `json:"config"`
-		HostConfig  *DockerHostConfig `json:"host_config"`
-		ImageConfig *DockerConfig     `json:"image_config"`
+	config := struct {
+		Config *ContainerConfig `json:"config"`
 	}{}
-	if err := json.NewDecoder(resp.Body).Decode(&confs); err != nil {
-		return nil, nil, nil, err
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, err
 	}
 
-	return confs.Config, confs.HostConfig, confs.ImageConfig, nil
+	return config.Config, nil
 }
 
 // Start makes an API request to a given Freighter host to start the Container

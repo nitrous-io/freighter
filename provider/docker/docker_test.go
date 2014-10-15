@@ -63,13 +63,6 @@ var _ = Describe("provider/docker", func() {
 		Expect(err).To(BeNil())
 	})
 
-	cleanUpContainer := func(name string) {
-		out, err := exec.Command("docker", "stop", "--time=1", name).CombinedOutput()
-		Expect(err).To(BeNil(), "docker stop %s failed with err: %+v", name, string(out))
-		out, err = exec.Command("docker", "rm", "-f", name).CombinedOutput()
-		Expect(err).To(BeNil(), "docker rm -f %s failed with err: %+v", name, string(out))
-	}
-
 	doInspect := func(id, format string) string {
 		out, err := exec.Command("docker", "inspect", "-f", format, id).CombinedOutput()
 		Expect(err).To(BeNil(), "docker inspect -f %v %v failed with output: %v", format, id, string(out))
@@ -142,7 +135,7 @@ var _ = Describe("provider/docker", func() {
 			name := RandomName("freightertest")
 			info, err := prov.CreateStart(name, NitrousImage, secret, "")
 			Expect(err).To(BeNil())
-			defer cleanUpContainer(name)
+			defer CleanUpContainer(name)
 			id := getID(name)
 			host := getHost(id)
 			gateway := getGateway(id)
@@ -194,14 +187,14 @@ var _ = Describe("provider/docker", func() {
 				name := RandomName("freightertest")
 				cnr, err := prov.CreateStart(name, imgName, secret, "")
 				if cnr != nil {
-					defer cleanUpContainer(name)
+					defer CleanUpContainer(name)
 				}
 				Expect(err).To(MatchError(provider.ErrCmdConfig))
 
 				configJSON := `{ "Cmd": ["yes"] }`
 				cnr, err = prov.CreateStart(name, imgName, secret, configJSON)
 				Expect(err).To(BeNil())
-				defer cleanUpContainer(name)
+				defer CleanUpContainer(name)
 				Expect(cnr.Cmd).To(Equal([]string{"yes"}))
 			})
 		})
@@ -219,7 +212,7 @@ var _ = Describe("provider/docker", func() {
 				name := RandomName("freightertest")
 				info, err := prov.CreateStart(name, NitrousImage, secret,
 					`{"PortBindings": ["127.0.0.1:99999:99999"]}`) // Port out of range.
-				defer cleanUpContainer(name)
+				defer CleanUpContainer(name)
 
 				_, ok := err.(*provider.StartFailedError)
 				Expect(ok).To(BeTrue())
@@ -256,7 +249,7 @@ var _ = Describe("provider/docker", func() {
 
 			AfterEach(func() {
 				if terminateAfterTest {
-					cleanUpContainer(name)
+					CleanUpContainer(name)
 				}
 			})
 
@@ -266,7 +259,7 @@ var _ = Describe("provider/docker", func() {
 					container2Name := RandomName("freightertest2")
 					container2Info, err := prov.CreateStart(container2Name, NitrousImage, secret, "")
 					Expect(err).To(BeNil())
-					defer cleanUpContainer(container2Name)
+					defer CleanUpContainer(container2Name)
 
 					list, err := prov.List()
 					Expect(err).To(BeNil())
@@ -323,20 +316,16 @@ var _ = Describe("provider/docker", func() {
 
 			Describe(".GetConfig()", func() {
 				It("returns container config", func() {
-					cnrConfig, cnrHostConfig, imageCfg, err := prov.GetConfig(id)
+					config, err := prov.GetConfig(id)
 					Expect(err).To(BeNil())
 					// not all config checked against -- elided to avoid test
 					// fragility wrt image changes
-					Expect(cnrConfig).NotTo(BeNil())
-					Expect(cnrConfig.Env).To(ContainElement("__HOST=172.17.42.1"))
-					Expect(cnrConfig.ExposedPorts).To(HaveKey("22/tcp"))
-					Expect(cnrHostConfig).NotTo(BeNil())
-					Expect(cnrHostConfig.Binds).To(HaveLen(1))
-					Expect(strings.HasSuffix(cnrHostConfig.Binds[0], ":/nitrous/ssh:ro")).To(BeTrue()) // FIXME newer Gomega has HaveSuffix
-					Expect(cnrHostConfig.PublishAllPorts).To(BeTrue())
-					Expect(imageCfg).NotTo(BeNil())
-					Expect(imageCfg.Env).To(ContainElement("NITROUS_USERNAME=action"))
-					Expect(imageCfg.ExposedPorts).To(HaveKey("22/tcp"))
+					Expect(config).NotTo(BeNil())
+					Expect(config.Env).To(ContainElement("__HOST=172.17.42.1"))
+					Expect(config.Mounts).To(HaveLen(1))
+					Expect(strings.HasSuffix(config.Mounts[0], "/nitrous/ssh:ro")).To(BeTrue())
+					Expect(config.Privileged).NotTo(BeTrue())
+					Expect(config.PublishAll).To(BeTrue())
 				})
 			})
 
@@ -638,7 +627,7 @@ var _ = Describe("provider/docker", func() {
 						defer func() {
 							out, _ := exec.Command("docker", "inspect", reconfig1.ID).CombinedOutput()
 							if !strings.Contains(string(out), "No such image or container") {
-								cleanUpContainer(reconfig1.ID)
+								CleanUpContainer(reconfig1.ID)
 							}
 						}()
 					}
@@ -660,7 +649,7 @@ var _ = Describe("provider/docker", func() {
 					}`
 					reconfig2, err := prov.Reconfig(reconfig1.ID, newConfigJSON)
 					if reconfig2 != nil { // id will change, default cleanup won't catch
-						defer cleanUpContainer(reconfig2.ID)
+						defer CleanUpContainer(reconfig2.ID)
 					}
 					Expect(err).To(BeNil())
 					// reconfig settings are not additive; the given config is
@@ -683,7 +672,7 @@ var _ = Describe("provider/docker", func() {
 
 					info, err := prov.Reconfig(id, configJSON)
 					if info != nil { // id will change, default cleanup won't catch
-						defer cleanUpContainer(info.ID)
+						defer CleanUpContainer(info.ID)
 					}
 					Expect(err).NotTo(BeNil())
 					Expect(err.Error()).To(ContainSubstring("reconfig failed on " + id))
@@ -1111,7 +1100,7 @@ var _ = Describe("provider/docker", func() {
 			}`
 			info, err := prov.CreateStart(name, NitrousImage, secret, configJSON)
 			Expect(err).To(BeNil())
-			defer cleanUpContainer(name)
+			defer CleanUpContainer(name)
 
 			id := getID(name)
 			imageID := getID(NitrousImage)
@@ -1347,7 +1336,7 @@ var _ = Describe("provider/docker", func() {
 					id1 = doInspect(i1[0], "{{.Id}}")
 					Expect(id1).ToNot(BeEmpty())
 
-					cleanUpContainer(containerId)
+					CleanUpContainer(containerId)
 				})
 			})
 

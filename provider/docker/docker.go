@@ -207,30 +207,12 @@ func (p *DockerProvider) Commit(id, imageName string) (*provider.ImageInfo, erro
 	return info.image, nil
 }
 
-// GetConfig returns (container config, container host config, image config, error)
-func (p *DockerProvider) GetConfig(id string) (*provider.DockerConfig, *provider.DockerHostConfig, *provider.DockerConfig, error) {
+func (p *DockerProvider) GetConfig(id string) (*provider.ContainerConfig, error) {
 	cnr, err := p.inspectContainer(id)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
-	img, err := p.client.InspectImage(cnr.Image)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	cnrHostConfig := &provider.DockerHostConfig{
-		PortBindings:    map[string][]provider.PortBinding{},
-		Binds:           cnr.HostConfig.Binds,
-		PublishAllPorts: cnr.HostConfig.PublishAllPorts,
-	}
-	for k, pbSlice := range cnr.HostConfig.PortBindings {
-		for _, pb := range pbSlice {
-			cnrHostConfig.PortBindings[string(k)] = append(cnrHostConfig.PortBindings[string(k)], provider.PortBinding{
-				HostIp:   pb.HostIp,
-				HostPort: pb.HostPort,
-			})
-		}
-	}
-	return convertConfig(cnr.Config), cnrHostConfig, convertConfig(img.Config), nil
+	return p.configFromContainer(cnr), nil
 }
 
 func (p *DockerProvider) GetInfo(id string) (*provider.ContainerInfo, error) {

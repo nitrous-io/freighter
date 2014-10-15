@@ -6,6 +6,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/nitrous-io/freighter/test"
+
 	"testing"
 )
 
@@ -15,11 +17,10 @@ func Test(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	err := exec.Command("docker", "pull", "scratch").Run()
-	Expect(err).To(BeNil(), "failed to pull scratch:latest image")
+	test.PullImage("tianon/true")
 })
 
 var _ = AfterSuite(func() {
-	err := exec.Command("docker", "rmi", "scratch:latest").Run()
-	Expect(err).To(BeNil(), "failed to remove scratch:latest image")
+	err := exec.Command("docker", "rmi", "tianon/true").Run()
+	Expect(err).To(BeNil(), "failed to remove tianon/true:latest image")
 })

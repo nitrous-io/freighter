@@ -1,6 +1,7 @@
 package docker_test
 
 import (
+	"fmt"
 	"path/filepath"
 
 	dockerclient "github.com/fsouza/go-dockerclient"
@@ -28,6 +29,92 @@ var _ = Describe("provider/docker config", func() {
 		logger := &util.Logger{Level: util.LogLevelQuiet}
 		prov, err = docker.NewDockerProvider(logger, datadir)
 		Expect(err).To(BeNil())
+	})
+
+	Describe("configFromContainer", func() {
+		var cnr *dockerclient.Container
+
+		addBinding := func(ports map[dockerclient.Port][]dockerclient.PortBinding, hostIP, hostPort, containerPort string) {
+			cport := dockerclient.Port(containerPort)
+			ports[cport] = append(ports[cport], dockerclient.PortBinding{
+				HostIp:   hostIP,
+				HostPort: hostPort,
+			})
+		}
+
+		BeforeEach(func() {
+			cnr = &dockerclient.Container{
+				State: dockerclient.State{},
+				Config: &dockerclient.Config{
+					Env: []string{},
+				},
+				HostConfig: &dockerclient.HostConfig{
+					PortBindings: map[dockerclient.Port][]dockerclient.PortBinding{},
+				},
+				NetworkSettings: &dockerclient.NetworkSettings{
+					Ports: map[dockerclient.Port][]dockerclient.PortBinding{},
+				},
+			}
+		})
+
+		It("returns privileged from container", func() {
+			cnr.HostConfig.Privileged = true
+			Expect(prov.ConfigFromContainer(cnr).Privileged).To(BeTrue())
+			cnr.HostConfig.Privileged = false
+			Expect(prov.ConfigFromContainer(cnr).Privileged).NotTo(BeTrue())
+		})
+
+		It("returns cmd from container", func() {
+			cnr.Config.Cmd = []string{"/sbin/init"}
+			Expect(prov.ConfigFromContainer(cnr).Cmd).To(Equal([]string{"/sbin/init"}))
+		})
+
+		It("returns envs from container", func() {
+			cnr.Config.Env = []string{"container=docker"}
+			Expect(prov.ConfigFromContainer(cnr).Env).To(Equal([]string{"container=docker"}))
+		})
+
+		It("returns publish all from container", func() {
+			cnr.HostConfig.PublishAllPorts = true
+			Expect(prov.ConfigFromContainer(cnr).PublishAll).To(BeTrue())
+			cnr.HostConfig.PublishAllPorts = false
+			Expect(prov.ConfigFromContainer(cnr).PublishAll).NotTo(BeTrue())
+		})
+
+		It("returns port bindings from network settings if running", func() {
+			cnr.State.Running = true
+			cnr.NetworkSettings.Ports[dockerclient.Port("9191")] = nil
+			addBinding(cnr.NetworkSettings.Ports, "0.0.0.0", "8080", "3000")
+			addBinding(cnr.NetworkSettings.Ports, docker.DefaultDockerGateway, "8000", "3000")
+			addBinding(cnr.NetworkSettings.Ports, docker.DefaultDockerGateway, "49123", "4000")
+			config := prov.ConfigFromContainer(cnr)
+			Expect(config.PortBindings).To(ConsistOf([]string{"public:8080:3000", "private:8000:3000", "private:49123:4000"}))
+		})
+
+		It("returns port bindings from hostconfig if not running", func() {
+			cnr.State.Running = false
+			cnr.NetworkSettings.Ports[dockerclient.Port("9191")] = nil
+			addBinding(cnr.HostConfig.PortBindings, "0.0.0.0", "8080", "3000")
+			addBinding(cnr.HostConfig.PortBindings, docker.DefaultDockerGateway, "49123", "4000")
+			config := prov.ConfigFromContainer(cnr)
+			Expect(config.PortBindings).To(ConsistOf([]string{"public:8080:3000", "private:49123:4000"}))
+		})
+
+		It("returns mounts from container", func() {
+			cnr.HostConfig.Binds = []string{
+				"/var/lib/freighter/containers/testcon/ssh:/nitrous/ssh:ro",
+				"/var/lib/docker/vfs/dir/12345:/data",
+				fmt.Sprintf("%s:%s", filepath.Join(datadir, "volumes", "music"), "/volumes/music"),
+				fmt.Sprintf("%s:%s", filepath.Join(datadir, "volumes", "misc"), "/data/misc"),
+			}
+			config := prov.ConfigFromContainer(cnr)
+			Expect(config.Mounts).To(ConsistOf([]string{
+				"/var/lib/freighter/containers/testcon/ssh:/nitrous/ssh:ro",
+				"/var/lib/docker/vfs/dir/12345:/data",
+				"music",
+				"misc:/data/misc",
+			}))
+		})
 	})
 
 	Describe("mkContainerConfig", func() {

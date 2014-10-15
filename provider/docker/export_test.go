@@ -8,6 +8,14 @@ import (
 	"github.com/nitrous-io/freighter/util"
 )
 
+var (
+	DefaultDockerGateway = defaultDockerGateway
+)
+
+func (p *DockerProvider) ConfigFromContainer(cnr *dockerclient.Container) *provider.ContainerConfig {
+	return p.configFromContainer(cnr)
+}
+
 func (p *DockerProvider) MkContainerConfig(cfg *provider.ContainerConfig, isNitrousImage bool) (*dockerclient.Config, error) {
 	return p.mkContainerConfig(cfg, isNitrousImage)
 }
