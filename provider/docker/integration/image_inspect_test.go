@@ -33,7 +33,7 @@ var _ = Describe("InspectImage", func() {
 	})
 
 	It("should be able to lookup information for a local image", func() {
-		imageList := CreateImages(1, "inspect", false, `FROM scratch
+		imageList := CreateImages(1, "inspect", false, `FROM tianon/true
 				MAINTAINER Callum Jones <callum@callumj.com>
 				ENV captain crunch
 				ENV mickey mouse

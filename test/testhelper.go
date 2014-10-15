@@ -188,3 +188,10 @@ func RemoveImages(names []string) {
 	out, err := exec.Command("docker", args...).CombinedOutput()
 	Expect(err).To(BeNil(), "Failed to remove images, output: %v", string(out))
 }
+
+func CleanUpContainer(name string) {
+	out, err := exec.Command("docker", "stop", "--time=1", name).CombinedOutput()
+	Expect(err).To(BeNil(), "docker stop %s failed with err: %+v", name, string(out))
+	out, err = exec.Command("docker", "rm", "-f", name).CombinedOutput()
+	Expect(err).To(BeNil(), "docker rm -f %s failed with err: %+v", name, string(out))
+}

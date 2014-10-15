@@ -17,20 +17,14 @@ var (
 
 // configFromContainer populates a ContainerConfig given a container
 func (p *DockerProvider) configFromContainer(cnr *dockerclient.Container) *provider.ContainerConfig {
-	config := &provider.ContainerConfig{
-		Privileged: cnr.HostConfig.Privileged,
-		Cmd:        cnr.Config.Cmd,
-		Env:        cnr.Config.Env,
-		PublishAll: cnr.HostConfig.PublishAllPorts,
-		Mounts:     mountBindsFromDocker(cnr.HostConfig.Binds, p.VolumesDir("")),
+	return &provider.ContainerConfig{
+		Privileged:   cnr.HostConfig.Privileged,
+		Cmd:          cnr.Config.Cmd,
+		Env:          cnr.Config.Env,
+		PublishAll:   cnr.HostConfig.PublishAllPorts,
+		Mounts:       mountBindsFromDocker(cnr.HostConfig.Binds, p.VolumesDir("")),
+		PortBindings: portBindingsFromDocker(cnr),
 	}
-	portsSource := cnr.HostConfig.PortBindings
-	if cnr.State.Running {
-		portsSource = cnr.NetworkSettings.Ports
-	}
-	config.PortBindings = portBindingsFromDocker(portsSource)
-
-	return config
 }
 
 func (p *DockerProvider) mkContainerConfig(cfg *provider.ContainerConfig, isTrustedImage bool) (*dockerclient.Config, error) {
@@ -230,15 +224,21 @@ func parsePortSpec(portSpec string) (dockerclient.Port, dockerclient.PortBinding
 }
 
 // portBindingsFromDocker converts docker portbindings back to
-// provider.ContainerConfig's format. It is almost the inverse of
-// portBindingsToDocker (except that unassigned host ports will be filled in).
-// Which means port specs will only have one of:
+// provider.ContainerConfig's format.
+// For running containers, the docker-assigned host port will be filled in, so
+// returned portspecs are limited to:
 //   public:hostPort:containerPort
 //   private:hostPort:containerPort
-func portBindingsFromDocker(dockerBindings map[dockerclient.Port][]dockerclient.PortBinding) []string {
+func portBindingsFromDocker(cnr *dockerclient.Container) []string {
+	portsSource := cnr.HostConfig.PortBindings
+	if cnr.State.Running {
+		portsSource = cnr.NetworkSettings.Ports
+	}
 	bindings := []string{}
-	for containerPort, portBindings := range dockerBindings {
+	for containerPort, portBindings := range portsSource {
 		if portBindings == nil {
+			// this happens when: port is exposed with no
+			// HostConfig.PortBinding and HostConfig.PublishAllPorts is false
 			// TODO investigate how else to resolve
 			continue
 		}
