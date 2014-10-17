@@ -371,6 +371,7 @@ func (s *Server) wsNewShell(w http.ResponseWriter, r *http.Request) error {
 	// stdin pipe will not need a TTY
 	noTTY, _ := strconv.ParseBool(r.FormValue("notty"))
 
+	log.Printf("[INFO]: starting a new shell on %s with command `%s`", containerID, command)
 	sh, err := shell.OpenShell(containerID, command, width, height, noTTY, info.Env)
 	if err != nil {
 		fmt.Println("wsNewShell: failed to open a shell for container %v", containerID, err)

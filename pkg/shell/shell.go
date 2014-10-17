@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"syscall"
@@ -94,21 +95,17 @@ func (s *Shell) Open(w, h int, env []string) error {
 		h = defaultHeight
 	}
 	if s.cmd == nil {
-		lxcEnv := []string{fmt.Sprintf("-vTERM=%s", defaultTerm)}
-		for _, e := range env {
-			lxcEnv = append(lxcEnv, fmt.Sprintf("-v%s", e))
-		}
 		args := []string{
-			"--name", s.id,
-			"--clear-env",
+			"exec",
+			"-it",
+			s.id,
+			"/bin/sh",
+			"-c",
+			fmt.Sprintf("TERM=%s %s", defaultTerm, s.command),
 		}
-		args = append(args, lxcEnv...)
-		args = append(args,
-			"--",
-			"sh", "-c", s.command,
-		)
-		s.cmd = exec.Command("lxc-attach", args...)
+		s.cmd = exec.Command("docker", args...)
 	}
+	log.Printf("[INFO] executing command %s", s.cmd)
 
 	s.stdoutR, s.stdoutW = io.Pipe()
 	if s.isTTY {
