@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"unicode/utf8"
 )
 
 var (
@@ -174,6 +175,17 @@ func (s *ShellWriter) Write(p []byte) (int, error) {
 	buf := make([]byte, l+len(dataMsg))
 	copy(buf[0:2], dataMsg)
 	copy(buf[2:], p)
+	if !utf8.Valid(buf) {
+		stripped := make([]rune, 0, len(buf))
+		for i := range buf {
+			r, size := utf8.DecodeRune(buf[i:])
+			if r == utf8.RuneError && size == 1 {
+				continue
+			}
+			stripped = append(stripped, r)
+		}
+		buf = []byte(string(stripped))
+	}
 	_, err := s.writer.Write(buf)
 	return l, err
 }

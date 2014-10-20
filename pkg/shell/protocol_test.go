@@ -101,6 +101,18 @@ func TestNewShellWriter(t *testing.T) {
 	}
 }
 
+func TestShellWriterStripsInvalidUTF8(t *testing.T) {
+	w := bytes.NewBuffer(nil)
+	s := NewShellWriter(w)
+
+	invalid := append([]byte("valid 触手色情"), []byte{0xff, 0xfe, 0xfd}...)
+	io.Copy(s, bytes.NewBuffer(invalid))
+
+	if w.String() != `d|valid 触手色情` {
+		t.Errorf("expect empty string to be written but got %s", w.String())
+	}
+}
+
 func TestShellWriterClose(t *testing.T) {
 	w := bytes.NewBuffer(nil)
 	s := NewShellWriter(w)
